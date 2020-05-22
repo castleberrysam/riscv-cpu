@@ -15,8 +15,11 @@ all: $(OUTS_ELF) $(OUTS_HEX)
 %.bin: %.elf
 	riscv64-linux-gnu-objcopy -O binary $< $@
 
-%.hex: %.bin
-	xxd -e -c4 -g4 $< | cut -d' ' -f2 > $@
+%.xxd: %.bin
+	xxd -e -c4 -g4 $< $@
+
+%.hex: %.xxd
+	cut -d' ' -f2 $< > $@
 
 clean:
 	-rm *.elf *.hex
