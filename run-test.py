@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
 import sys
-import subprocess
 import re
+import glob
+import os
+from subprocess import Popen, PIPE, DEVNULL, TimeoutExpired
 
 abi_names = {
     "zero": 0,
@@ -56,14 +58,15 @@ class Insn:
         return self.addr == other.addr and self.regvals == other.regvals
 
 def run_iverilog(vvp_file, hex_file):
+    process = Popen(["vvp", vvp_file, "+memfile=" + hex_file], stdout=PIPE)
     try:
-        result = subprocess.run(["vvp", vvp_file, "+memfile=" + hex_file],
-                                stdout=subprocess.PIPE,
-                                timeout=1)
-    except subprocess.TimeoutExpired:
-        print("Timed out")
+        result = process.communicate(timeout=3)[0].decode()
+    except TimeoutExpired:
+        print("iverilog timed out")
         return None
-    result = result.stdout.decode()
+    finally:
+        process.kill()
+
     result = result.split("\n")
 
     insns = []
@@ -93,15 +96,23 @@ def run_iverilog(vvp_file, hex_file):
     return insns
 
 def run_qemu(elf_file):
+    process_qemu = Popen(["qemu-system-riscv32", "-s", "-S", "--cpu", "rv32",
+                          "--display", "none", "--monitor", "stdio", "--kernel", elf_file],
+                         stdin=PIPE, stdout=DEVNULL, stderr=DEVNULL);
+    process_gdb = Popen(["riscv64-linux-gnu-gdb", "-q", "--batch",
+                         "-ex", "source gdb-qemu.py",
+                         "-ex", "run_test"],
+                        stdout=PIPE, stderr=DEVNULL)
     try:
-        result = subprocess.run(["riscv64-linux-gnu-gdb", "-q", elf_file],
-                                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                                timeout=1)
-    except subprocess.TimeoutExpired:
-        print("Timed out")
+        result = process_gdb.communicate(timeout=3)[0].decode()
+    except TimeoutExpired:
+        print("gdb-qemu timed out")
         return None
-    result = result.stdout.decode()
-    result = result.split("\n")[4:-3]
+    finally:
+        process_gdb.kill()
+        process_qemu.kill()
+
+    result = result.split("\n")[3:-3]
 
     insns = []
     insn = None
@@ -146,38 +157,42 @@ def run_qemu(elf_file):
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: " + sys.argv[0] + " <test binary>")
+        print("Usage: " + sys.argv[0] + " <test name>")
         return
 
+    tests = []
     verbose = False
     if sys.argv[1] == "all":
-        result = subprocess.run("find test -name \\*.elf | xargs basename -s .elf",
-                                shell=True, stdout=subprocess.PIPE);
-        result = result.stdout.decode()
-        tests = result.split("\n")
+        for elf in glob.iglob("test/*.elf"):
+            tests.append(os.path.basename(elf)[:-4])
     else:
         verbose = True
-        tests = [sys.argv[1]]
+        tests.append(sys.argv[1])
+
+    if len(tests) == 0:
+        print("No tests to run. Maybe you need to run make first.")
+        return
 
     for test in tests:
+        print("{:16s}".format(test + ":"), end="", flush=True)
+
         qemu_insns = run_qemu("test/" + test + ".elf")
         if not qemu_insns:
-            return
+            continue
+
+        iverilog_insns = run_iverilog("src/top", "test/" + test + ".hex")
+        if not iverilog_insns:
+            continue
+
+        print("pass" if qemu_insns == iverilog_insns else "fail")
+
         if verbose:
             print("from qemu:")
             for insn in qemu_insns:
                 print(insn)
-
-        iverilog_insns = run_iverilog("src/top", "test/" + test + ".hex")
-        if not iverilog_insns:
-            return
-        if verbose:
-            print("\nfrom iverilog:")
+            print("from iverilog:")
             for insn in iverilog_insns:
                 print(insn)
-            print();
-
-        print(test + ": " + ("pass" if qemu_insns == iverilog_insns else "fail"))
 
 if __name__ == "__main__":
     main()
