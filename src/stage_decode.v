@@ -153,23 +153,29 @@ module stage_decode(
             ex_use_pc0 <= (opcode == OP_JAL) | (opcode == OP_AUIPC);
             ex_use_pc1 <= (opcode == OP_JAL) | (opcode == OP_BRANCH);
             ex_use_imm <= (format != FORMAT_R) & (opcode != OP_BRANCH);
-            ex_sub_sra <= (opcode == OP_OP) & de_insn[30];
+            ex_sub_sra <= (opcode == OP_OP) & funct7[5];
         end
 
     wire [2:0] funct3 = de_insn[14:12];
+    wire [6:0] funct7 = de_insn[31:25];
     always @(posedge clk)
       if(!ex_stall)
         case(opcode)
           OP_OP, OP_OP_IMM:
-            case(funct3)
-              3'b000: ex_op <= ALUOP_ADD;
-              3'b001: ex_op <= ALUOP_SL;
-              3'b010: ex_op <= ALUOP_SLT;
-              3'b011: ex_op <= ALUOP_SLTU;
-              3'b100: ex_op <= ALUOP_XOR;
-              3'b101: ex_op <= ALUOP_SR;
-              3'b110: ex_op <= ALUOP_OR;
-              3'b111: ex_op <= ALUOP_AND;
+            case({funct7[0] , funct3})
+              4'b0000: ex_op <= ALUOP_ADD;
+              4'b0001: ex_op <= ALUOP_SL;
+              4'b0010: ex_op <= ALUOP_SLT;
+              4'b0011: ex_op <= ALUOP_SLTU;
+              4'b0100: ex_op <= ALUOP_XOR;
+              4'b0101: ex_op <= ALUOP_SR;
+              4'b0110: ex_op <= ALUOP_OR;
+              4'b0111: ex_op <= ALUOP_AND;
+              // M extension.
+              4'b1000: ex_op <= ALUOP_MUL;
+              4'b1001: ex_op <= ALUOP_MULH;
+              4'b1010: ex_op <= ALUOP_MULHSU;
+              4'b1011: ex_op <= ALUOP_MULHU;
             endcase
 
           OP_LOAD, OP_STORE: ex_op <= ALUOP_ADD;
