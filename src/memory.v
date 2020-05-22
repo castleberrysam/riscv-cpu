@@ -19,6 +19,7 @@ module memory(
 
     reg [31:0] storage[0:16383];
 
+    `ifndef SYNTHESIS
     integer i;
     reg [8*32:1] memfile;
     initial
@@ -29,6 +30,7 @@ module memory(
             memfile = "memory.hex";
           $readmemh(memfile, storage);
       end
+    `endif
 
     function [31:0] read(
       input [31:0] addr,
