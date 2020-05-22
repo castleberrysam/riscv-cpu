@@ -1,0 +1,4 @@
+*.vcd
+./src/top
+./test/*.elf
+./test/*.hex
