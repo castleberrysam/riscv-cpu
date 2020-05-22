@@ -50,7 +50,12 @@ localparam
   ALUOP_SLTU = 4'd7,
              
   ALUOP_SL   = 4'd8,
-  ALUOP_SR   = 4'd9;
+  ALUOP_SR   = 4'd9,
+
+  ALUOP_MUL    = 4'd10,
+  ALUOP_MULH   = 4'd11,
+  ALUOP_MULHSU = 4'd12,
+  ALUOP_MULHU  = 4'd13;
 
 // File descriptors
 localparam

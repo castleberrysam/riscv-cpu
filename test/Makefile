@@ -7,7 +7,7 @@ OUTS_HEX := $(SRCS:.s=.hex)
 all: $(OUTS_ELF) $(OUTS_HEX)
 
 %.o: %.s
-	riscv64-linux-gnu-as -march=rv32i -o $@ $<
+	riscv64-linux-gnu-as -march=rv32im -o $@ $<
 
 %.elf: %.o
 	riscv64-linux-gnu-ld -melf32lriscv -Tlink.ld -o $@ $<
