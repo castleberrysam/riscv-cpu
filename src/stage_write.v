@@ -28,6 +28,7 @@ module stage_write(
 
     assign wb_stall = 0;
 
+    `ifndef SYNTHESIS
     reg [31:0] retire_pc;
     always @(posedge clk)
       if(wb_valid)
@@ -35,5 +36,6 @@ module stage_write(
             retire_pc <= wb_pc;
             $strobe("%d: stage_write: retire insn at pc %08x", $stime, retire_pc);
         end
+    `endif
 
 endmodule

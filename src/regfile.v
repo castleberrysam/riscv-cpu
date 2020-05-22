@@ -102,8 +102,10 @@ module regfile(
                   regs[wreg0] <= wdata0;
                   valid[wreg0] <= 1;
 
+                  `ifndef SYNTHESIS
                   write_time = $stime;
                   #1 $display("%d: regfile: port 0 write %0s (x%0d) = %08x", write_time, abi_name(wreg0), wreg0, wdata0);
+                  `endif
               end
         end
 

@@ -84,6 +84,7 @@ module stage_mem(
           wb_data <= data_in;
       end
 
+    `ifndef SYNTHESIS
     reg [31:0] retire_time, retire_pc;
     always @(posedge clk)
       if(wen)
@@ -92,6 +93,7 @@ module stage_mem(
             retire_pc = mem_pc;
             #1 $strobe("%d: stage_mem: retire insn at pc %08x", retire_time, retire_pc);
         end
+    `endif
 
     assign mem_stall = mem_valid & (wb_stall | (req & ~ack));
     always @(posedge clk)
