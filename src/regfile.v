@@ -75,6 +75,8 @@ module regfile(
 
     integer i;
     reg [31:0] write_time;
+    reg [4:0]  write_reg;
+    reg [31:0] write_val;
     always @(posedge clk)
       if(~reset_n)
         begin
@@ -104,7 +106,9 @@ module regfile(
 
                   `ifndef SYNTHESIS
                   write_time = $stime;
-                  #1 $display("%d: regfile: port 0 write %0s (x%0d) = %08x", write_time, abi_name(wreg0), wreg0, wdata0);
+                  write_reg = wreg0;
+                  write_val = wdata0;
+                  #1 $display("%d: regfile: port 0 write %0s (x%0d) = %08x", write_time, abi_name(write_reg), write_reg, write_val);
                   `endif
               end
         end

@@ -19,7 +19,7 @@ module tb_top(
 
           clk = 0;
           reset_n = 0;
-          #20;
+          #10;
           reset_n = 1;
       end
 

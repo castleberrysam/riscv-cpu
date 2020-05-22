@@ -17,8 +17,8 @@ module top(
 
     wire        fe_req;
     wire [31:0] fe_addr;
-    reg         fe_ack;
-    reg [31:0]  fe_data;
+    wire        fe_ack;
+    wire [31:0] fe_data;
 
     wire        de_valid;
     wire [31:0] de_insn;
@@ -79,8 +79,8 @@ module top(
     wire [31:0] mem_data_out;
     wire        mem_extend_out;
     wire [1:0]  mem_width_out;
-    reg         mem_ack;
-    reg [31:0]  mem_data_in;
+    wire        mem_ack;
+    wire [31:0] mem_data_in;
 
     wire        wb_valid;
 
@@ -88,70 +88,6 @@ module top(
 
     wire [4:0]  wb_reg_r_r;
     wire [31:0] wb_data;
-
-    reg         memory_req;
-    reg [31:0]  memory_addr;
-    reg         memory_write;
-    reg [31:0]  memory_data_in;
-    reg         memory_extend;
-    reg [1:0]   memory_width;
-    wire        memory_ack;
-    wire [31:0] memory_data_out;
-
-    reg         arb_delay;
-    reg         arb_which;
-    always @(posedge clk)
-      if(~reset_n)
-        begin
-            arb_delay <= 0;
-            memory_req <= 0;
-            fe_ack <= 0;
-            mem_ack <= 0;
-        end
-      else if(arb_delay)
-        begin
-            fe_ack <= 0;
-            mem_ack <= 0;
-            arb_delay <= 0;
-        end
-      else if(!memory_req)
-        begin
-            if(mem_req)
-              begin
-                  memory_req <= 1;
-                  arb_which <= 0;
-                  memory_addr <= mem_addr;
-                  memory_write <= mem_write_out;
-                  memory_data_in <= mem_data_out;
-                  memory_extend <= mem_extend_out;
-                  memory_width <= mem_width_out;
-              end
-            else if(fe_req)
-              begin
-                  memory_req <= 1;
-                  arb_which <= 1;
-                  memory_addr <= fe_addr;
-                  memory_write <= 0;
-                  memory_data_in <= 32'b0;
-                  memory_extend <= 0;
-                  memory_width <= 2'b10;
-              end
-        end
-      else if(memory_ack)
-        if(!arb_which)
-          begin
-              arb_delay <= 1;
-              memory_req <= 0;
-              mem_ack <= 1;
-              mem_data_in <= memory_data_out;
-          end
-        else
-          begin
-              arb_delay <= 1;
-              memory_req <= 0;
-              fe_ack <= 1;
-              fe_data <= memory_data_out;
-          end
 
     stage_fetch fetch(
       .clk(clk),
@@ -163,10 +99,10 @@ module top(
       .pc_wen(pc_wen),
       .pc_in(pc),
 
-      .req(fe_req),
-      .addr(fe_addr),
-      .ack(fe_ack),
-      .data(fe_data),
+      .fe_req(fe_req),
+      .fe_addr(fe_addr),
+      .fe_ack(fe_ack),
+      .fe_data(fe_data),
 
       .de_valid(de_valid),
       .de_insn(de_insn),
@@ -340,14 +276,19 @@ module top(
       .clk(clk),
       .reset_n(reset_n),
 
-      .req(memory_req),
-      .addr(memory_addr),
-      .write_in(memory_write),
-      .data_in(memory_data_in),
-      .extend(memory_extend),
-      .width(memory_width),
-      .ack(memory_ack),
-      .data_out(memory_data_out)
+      .fe_req(fe_req),
+      .fe_addr(fe_addr),
+      .fe_ack(fe_ack),
+      .fe_data(fe_data),
+
+      .mem_req(mem_req),
+      .mem_addr(mem_addr),
+      .mem_write(mem_write_out),
+      .mem_data_in(mem_data_out),
+      .mem_extend(mem_extend_out),
+      .mem_width(mem_width_out),
+      .mem_ack(mem_ack),
+      .mem_data_out(mem_data_in)
       );
 
 endmodule

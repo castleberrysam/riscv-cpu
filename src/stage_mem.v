@@ -56,7 +56,7 @@ module stage_mem(
   output reg [31:0] wb_pc,
 
   output reg [4:0]  wb_reg_r,
-  output reg [31:0] wb_data
+  output [31:0]     wb_data
   );
 
     assign
@@ -75,13 +75,13 @@ module stage_mem(
     assign
       wreg = wb_reg,
       wdata = mem_data0,
-      wen = mem_valid & (mem_jmp | ~req);
+      wen = mem_valid & ~req;
 
+    assign wb_data = data_in;
     always @(posedge clk)
       begin
           wb_pc <= mem_pc;
           wb_reg_r <= wb_reg;
-          wb_data <= data_in;
       end
 
     `ifndef SYNTHESIS

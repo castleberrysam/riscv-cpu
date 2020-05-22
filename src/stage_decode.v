@@ -205,18 +205,18 @@ module stage_decode(
             mem_br_inv <= funct3[0];
         end
 
+    `ifndef SYNTHESIS
+    always @(posedge clk)
+      if(de_stall)
+        $display("%d: stage_decode: stalling", $stime);
+    `endif
+
     wire error = format[6];
     assign de_stall = de_valid & (ex_stall | error | (~rs1_valid | ~rs2_valid));
     always @(posedge clk)
       if(~reset_n)
         ex_valid <= 0;
       else
-        begin
-            /*
-            if(de_stall)
-              $display("%d: stage_decode: stalling", $stime);
-             */
-            ex_valid <= ex_stall | (de_valid & ~de_stall);
-        end
+        ex_valid <= ex_stall | (de_valid & ~de_stall);
 
 endmodule

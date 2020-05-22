@@ -14,47 +14,39 @@ module stage_fetch(
   input [31:0]      pc_in,
 
   // inputs/outputs to memory
-  output            req,
-  output [31:0]     addr,
-  input             ack,
-  input [31:0]      data,
+  output            fe_req,
+  output [31:0]     fe_addr,
+  input             fe_ack,
+  input [31:0]      fe_data,
 
   // outputs to decode stage
   output reg        de_valid,
-  output reg [31:0] de_insn,
+  output [31:0]     de_insn,
   output reg [31:0] de_pc
   );
 
+    assign de_insn = fe_data;
+    wire fe_stall = fe_data[6];
+
     reg [31:0] pc;
-    reg        pc_valid;
+    wire [31:0] cur_pc = pc_wen ? pc_in : pc;
 
-    assign req = pc_valid;
-    assign addr = pc;
+    assign fe_req = (~fe_stall | fe_enable) & ~de_stall;
+    assign fe_addr = cur_pc;
 
-    wire [4:0] opcode = data[6:2];
     always @(posedge clk)
       if(~reset_n)
+        pc <= 32'h80000000;
+      else if(fe_req)
+        pc <= cur_pc + 4;
+
+    always @(posedge clk)
+      if(~reset_n)
+        de_valid <= 0;
+      else if(fe_ack & ~de_stall)
         begin
-            de_valid <= 0;
-            pc <= 32'h80000000;
-            pc_valid <= 1;
-        end
-      else if(fe_enable)
-        begin
-            //$display("%d: stage_fetch: write pc = %08x", $stime, pc_in);
-            de_valid <= de_stall;
-            if(pc_wen)
-              pc <= pc_in;
-            pc_valid <= 1;
-        end
-      else if(ack & ~de_stall)
-        begin
-            //$display("%d: stage_fetch: fetch insn %08x at pc %08x", $stime, data, pc);
             de_valid <= 1;
-            de_insn <= data;
-            de_pc <= pc;
-            pc <= pc + 4;
-            pc_valid <= ~data[6];
+            de_pc <= cur_pc;
         end
       else
         de_valid <= de_stall;
