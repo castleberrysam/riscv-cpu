@@ -51,3 +51,9 @@ localparam
              
   ALUOP_SL   = 4'd8,
   ALUOP_SR   = 4'd9;
+
+// File descriptors
+localparam
+  STDIN  = 32'h80000000,
+  STDOUT = 32'h80000001,
+  STDERR = 32'h80000002;

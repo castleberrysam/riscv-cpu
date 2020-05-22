@@ -17,17 +17,31 @@ module memory(
   output reg [31:0] data_out
   );
 
+    `include "defines.vh"
+
     reg [31:0] storage[0:16383];
 
     `ifndef SYNTHESIS
     integer i;
     reg [8*32:1] memfile;
+    reg [31:0] fd;
+    reg [640:1] error;
     initial
       begin
           for(i=0;i<16384;i=i+1)
             storage[i] = 32'b0;
+
           if(!$value$plusargs("memfile=%s", memfile))
             memfile = "memory.hex";
+
+          fd = $fopen(memfile, "r");
+          if(fd == 32'b0)
+            begin
+                $fdisplay(STDERR, "Cannot open memfile %0s: error %0d (%0s)", memfile, $ferror(fd, error), error);
+                $finish;
+            end
+          $fclose(fd);
+
           $readmemh(memfile, storage);
       end
     `endif
