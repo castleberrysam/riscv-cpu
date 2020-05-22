@@ -84,12 +84,13 @@ module stage_mem(
           wb_data <= data_in;
       end
 
-    reg [31:0] retire_pc;
+    reg [31:0] retire_time, retire_pc;
     always @(posedge clk)
       if(wen)
         begin
-            retire_pc <= mem_pc;
-            $strobe("%d: stage_mem: retire insn at pc %08x", $stime, retire_pc);
+            retire_time = $stime;
+            retire_pc = mem_pc;
+            #1 $strobe("%d: stage_mem: retire insn at pc %08x", retire_time, retire_pc);
         end
 
     assign mem_stall = mem_valid & (wb_stall | (req & ~ack));

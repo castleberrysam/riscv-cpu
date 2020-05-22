@@ -74,6 +74,7 @@ module regfile(
     assign rs2_valid = rs2 ? valid[rs2] : 1;
 
     integer i;
+    reg [31:0] write_time;
     always @(posedge clk)
       if(~reset_n)
         begin
@@ -98,9 +99,11 @@ module regfile(
               end
             if(wen0 && |wreg0)
               begin
-                  $display("%d: regfile: port 0 write %0s (x%0d) = %08x", $stime, abi_name(wreg0), wreg0, wdata0);
                   regs[wreg0] <= wdata0;
                   valid[wreg0] <= 1;
+
+                  write_time = $stime;
+                  #1 $display("%d: regfile: port 0 write %0s (x%0d) = %08x", write_time, abi_name(wreg0), wreg0, wdata0);
               end
         end
 
