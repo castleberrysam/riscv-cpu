@@ -37,7 +37,7 @@ module stage_fetch(
     always @(posedge clk)
       if(~reset_n)
         pc <= 32'h80000000;
-      else if(fe_req)
+      else if(fe_ack)
         pc <= cur_pc + 4;
 
     always @(posedge clk)
