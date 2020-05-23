@@ -119,10 +119,6 @@ module top(
 
       .ex_stall(ex_stall),
 
-      .mem_wreg(mem_wreg),
-      .mem_wdata(mem_wdata),
-      .mem_wen(mem_wen),
-
       .wb_wreg(wb_wreg),
       .wb_wdata(wb_wdata),
       .wb_wen(wb_wen),
@@ -239,10 +235,6 @@ module top(
       .fe_enable(fe_enable),
       .pc_wen(pc_wen),
       .pc(pc),
-
-      .wreg(mem_wreg),
-      .wdata(mem_wdata),
-      .wen(mem_wen),
 
       .mem_stall(mem_stall),
 

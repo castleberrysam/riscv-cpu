@@ -13,11 +13,6 @@ module stage_decode(
   // inputs from execute stage
   input             ex_stall,
 
-  // inputs from mem stage
-  input [4:0]       mem_wreg,
-  input [31:0]      mem_wdata,
-  input             mem_wen,
-
   // inputs from write stage
   input [4:0]       wb_wreg,
   input [31:0]      wb_wdata,
@@ -131,13 +126,9 @@ module stage_decode(
       .rd(rd),
       .reserve(de_valid & ~de_stall & (opcode != OP_BRANCH) & (opcode != OP_STORE)),
 
-      .wreg0(mem_wreg),
-      .wdata0(mem_wdata),
-      .wen0(mem_wen),
-
-      .wreg1(wb_wreg),
-      .wdata1(wb_wdata),
-      .wen1(wb_wen)
+      .wreg(wb_wreg),
+      .wdata(wb_wdata),
+      .wen(wb_wen)
       );
 
     always @(posedge clk)

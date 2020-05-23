@@ -42,11 +42,6 @@ module stage_mem(
   output            pc_wen,
   output [31:0]     pc,
 
-  // outputs to decode stage
-  output [4:0]      wreg,
-  output [31:0]     wdata,
-  output            wen,
-
   // outputs to execute stage
   output            mem_stall,
 
@@ -56,7 +51,7 @@ module stage_mem(
   output reg [31:0] wb_pc,
 
   output reg [4:0]  wb_reg_r,
-  output [31:0]     wb_data
+  output     [31:0] wb_data
   );
 
     assign
@@ -72,34 +67,30 @@ module stage_mem(
       pc_wen = mem_valid & (mem_jmp | (mem_br & (mem_data0[0] ^ mem_br_inv))),
       pc = mem_data1;
 
-    assign
-      wreg = wb_reg,
-      wdata = mem_data0,
-      wen = mem_valid & ~req;
+    // When accessing from memory, assign the writeback data to the
+    // value fetched from memory. Otherwise, just propagate the data
+    // from execute through a register.
+    reg use_data_in;
+    reg [31:0] reg_data;
+    always @(posedge clk)
+      begin
+         reg_data = mem_data0;
+         use_data_in = (mem_valid & mem_read);
+      end
 
-    assign wb_data = data_in;
+    assign wb_data = use_data_in ? data_in : reg_data;
+
     always @(posedge clk)
       begin
           wb_pc <= mem_pc;
           wb_reg_r <= wb_reg;
       end
 
-    `ifndef SYNTHESIS
-    reg [31:0] retire_time, retire_pc;
-    always @(posedge clk)
-      if(wen)
-        begin
-            retire_time = $stime;
-            retire_pc = mem_pc;
-            #1 $strobe("%d: stage_mem: retire insn at pc %08x", retire_time, retire_pc);
-        end
-    `endif
-
     assign mem_stall = mem_valid & (wb_stall | (req & ~ack));
     always @(posedge clk)
       if(~reset_n)
         wb_valid <= 0;
       else
-        wb_valid <= wb_stall | (mem_valid & ~mem_stall & ~wen);
+        wb_valid <= wb_stall | (mem_valid & ~mem_stall) | (mem_valid & ~req);
 
 endmodule

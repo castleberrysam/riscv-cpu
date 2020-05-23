@@ -16,13 +16,10 @@ module regfile(
   input [4:0]       rd,
   input             reserve,
 
-  input [4:0]       wreg0,
-  input [31:0]      wdata0,
-  input             wen0,
+  input [4:0]       wreg,
+  input [31:0]      wdata,
+  input             wen
 
-  input [4:0]       wreg1,
-  input [31:0]      wdata1,
-  input             wen1
   );
 
     `include "defines.vh"
@@ -31,8 +28,7 @@ module regfile(
     reg [31:1] valid;
 
     // read port 1 (with passthrough)
-    wire wr0_rs1 = wen0 & (wreg0 == rs1);
-    wire wr1_rs1 = wen1 & (wreg1 == rs1);
+    wire wr_rs1 = wen & (wreg == rs1);
     always @(*)
       begin
           if(~|rs1)
@@ -40,15 +36,10 @@ module regfile(
                 rs1_valid = 1;
                 rs1_data = 32'b0;
             end
-          else if(wr0_rs1)
+          else if(wr_rs1)
             begin
                 rs1_valid = 1;
-                rs1_data = wdata0;
-            end
-          else if(wr1_rs1)
-            begin
-                rs1_valid = 1;
-                rs1_data = wdata1;
+                rs1_data = wdata;
             end
           else
             begin
@@ -58,8 +49,7 @@ module regfile(
       end
 
     // read port 2 (with passthrough)
-    wire wr0_rs2 = wen0 & (wreg0 == rs2);
-    wire wr1_rs2 = wen1 & (wreg1 == rs2);
+    wire wr_rs2 = wen & (wreg == rs2);
     always @(*)
       begin
           if(~|rs2)
@@ -67,15 +57,10 @@ module regfile(
                 rs2_valid = 1;
                 rs2_data = 32'b0;
             end
-          else if(wr0_rs2)
+          else if(wr_rs2)
             begin
                 rs2_valid = 1;
-                rs2_data = wdata0;
-            end
-          else if(wr1_rs2)
-            begin
-                rs2_valid = 1;
-                rs2_data = wdata1;
+                rs2_data = wdata;
             end
           else
             begin
@@ -92,15 +77,8 @@ module regfile(
       begin
           if(reserve && |rd)
             $display("%d: regfile: reserve %0s (x%0d)", $stime, abi_name(rd), rd);
-          if(wen1 && |wreg1)
-            $display("%d: regfile: port 1 write %0s (x%0d) = %08x", $stime, abi_name(wreg1), wreg1, wdata1);
-          if(wen0 && |wreg0)
-            begin
-                write_time = $stime;
-                write_reg = wreg0;
-                write_val = wdata0;
-                #1 $display("%d: regfile: port 0 write %0s (x%0d) = %08x", write_time, abi_name(write_reg), write_reg, write_val);
-            end
+          if(wen && |wreg)
+            $display("%d: regfile: write %0s (x%0d) = %08x", $stime, abi_name(wreg), wreg, wdata);
       end
 `endif
 
@@ -114,15 +92,10 @@ module regfile(
           end
       else
         begin
-            if(wen1 && |wreg1)
+            if(wen && |wreg)
               begin
-                  regs[wreg1] <= wdata1;
-                  valid[wreg1] <= 1;
-              end
-            if(wen0 && |wreg0)
-              begin
-                  regs[wreg0] <= wdata0;
-                  valid[wreg0] <= 1;
+                  regs[wreg] <= wdata;
+                  valid[wreg] <= 1;
               end
             if(reserve && |rd)
               valid[rd] <= 0;

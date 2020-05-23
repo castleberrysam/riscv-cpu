@@ -75,7 +75,7 @@ def run_iverilog(vvp_file, hex_file):
     regs = [0] * 32
     for line in result:
         # check for reg write
-        match = re.match("\s*\d+: regfile: port \d+ write (\S+) \S+ = (\S+)", line)
+        match = re.match("\s*\d+: regfile: write (\S+) \S+ = (\S+)", line)
         if match:
             regname = match.group(1)
             regnum = abi_names[regname]
