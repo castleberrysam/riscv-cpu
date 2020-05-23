@@ -158,11 +158,12 @@ module stage_decode(
 
     wire [2:0] funct3 = de_insn[14:12];
     wire [6:0] funct7 = de_insn[31:25];
+    wire mul = (opcode == OP_OP) & funct7[0];
     always @(posedge clk)
       if(!ex_stall)
         case(opcode)
           OP_OP, OP_OP_IMM:
-            case({(funct7[0] & (opcode != OP_OP_IMM)), funct3})
+            case({mul,funct3})
               4'b0000: ex_op <= ALUOP_ADD;
               4'b0001: ex_op <= ALUOP_SL;
               4'b0010: ex_op <= ALUOP_SLT;
