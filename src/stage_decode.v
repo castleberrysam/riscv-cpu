@@ -162,7 +162,7 @@ module stage_decode(
       if(!ex_stall)
         case(opcode)
           OP_OP, OP_OP_IMM:
-            case({funct7[0] , funct3})
+            case({(funct7[0] & (opcode != OP_OP_IMM)), funct3})
               4'b0000: ex_op <= ALUOP_ADD;
               4'b0001: ex_op <= ALUOP_SL;
               4'b0010: ex_op <= ALUOP_SLT;
