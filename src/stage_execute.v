@@ -74,14 +74,16 @@ module stage_execute(
 
     wire [31:0] op1 = ex_use_pc0 ? ex_pc : ex_rdata1;
     wire [31:0] op2 = mem_jmp ? 32'd4 : (ex_use_imm ? ex_imm : ex_rdata2);
+
     reg [63:0] mul_result;
     always @(*)
-      case (ex_op)
+      case(ex_op)
         ALUOP_MUL: mul_result = op1 * op2;
         ALUOP_MULH: mul_result = $signed(op1) * $signed(op2);
         ALUOP_MULHSU: mul_result = $signed(op1) * op2;
         ALUOP_MULHU: mul_result = op1 * op2;
       endcase
+
     always @(posedge clk)
       if(!mem_stall)
         case(ex_op)
