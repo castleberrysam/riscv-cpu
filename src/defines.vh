@@ -57,3 +57,43 @@ localparam
   STDIN  = 32'h80000000,
   STDOUT = 32'h80000001,
   STDERR = 32'h80000002;
+
+// Utility functions
+function [8*5:1] abi_name(
+  input [4:0] regnum
+  );
+    case(regnum)
+      5'd0: abi_name = "zero";
+      5'd1: abi_name = "ra";
+      5'd2: abi_name = "sp";
+      5'd3: abi_name = "gp";
+      5'd4: abi_name = "tp";
+      5'd5: abi_name = "t0";
+      5'd6: abi_name = "t1";
+      5'd7: abi_name = "t2";
+      5'd8: abi_name = "fp";
+      5'd9: abi_name = "s1";
+      5'd10: abi_name = "a0";
+      5'd11: abi_name = "a1";
+      5'd12: abi_name = "a2";
+      5'd13: abi_name = "a3";
+      5'd14: abi_name = "a4";
+      5'd15: abi_name = "a5";
+      5'd16: abi_name = "a6";
+      5'd17: abi_name = "a7";
+      5'd18: abi_name = "s2";
+      5'd19: abi_name = "s3";
+      5'd20: abi_name = "s4";
+      5'd21: abi_name = "s5";
+      5'd22: abi_name = "s6";
+      5'd23: abi_name = "s7";
+      5'd24: abi_name = "s8";
+      5'd25: abi_name = "s9";
+      5'd26: abi_name = "s10";
+      5'd27: abi_name = "s11";
+      5'd28: abi_name = "t3";
+      5'd29: abi_name = "t4";
+      5'd30: abi_name = "t5";
+      5'd31: abi_name = "t6";
+    endcase
+endfunction
