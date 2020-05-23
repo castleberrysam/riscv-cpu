@@ -26,8 +26,8 @@ module tb_top(
     always
       #5 clk = ~clk;
 
-    always @(uut.de_insn)
-      if(uut.de_insn == 32'h00002013) // slti x0, x0, 0
-        #50 $finish;
+    always @(posedge clk)
+      if(uut.de_valid & uut.decode.error & ~uut.ex_valid & ~uut.mem_valid & ~uut.wb_valid)
+        $finish;
 
 endmodule

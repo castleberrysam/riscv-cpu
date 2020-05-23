@@ -7,4 +7,4 @@
 	lh	t1, 2(s0)
 	lh	a0, 0(s0)
 	lb	s1, 1(s0)
-	slti	x0, x0, 0
+	.word	0

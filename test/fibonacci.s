@@ -1,7 +1,6 @@
 	.text
 	li	a0, 100
 	jal	ra, fibonacci
-	slti	x0, x0, 0
 	.word	0
 
 fibonacci:

@@ -13,4 +13,4 @@ never_reach:
 	j	end
 
 end:	addi	a0, a0, 1
-	slti	x0, x0, 0
+	.word	0

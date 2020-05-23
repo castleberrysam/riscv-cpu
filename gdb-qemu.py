@@ -2,7 +2,6 @@
 # qemu-system-riscv32 -s -S --cpu rv32 --display none --kernel <elf file>
 
 import gdb
-import re
 
 class RunTest(gdb.Command):
   def __init__(self):
@@ -16,9 +15,9 @@ class RunTest(gdb.Command):
       gdb.execute("set $x" + str(i) + " = 0")
     while True:
       insn = gdb.execute("x/i $pc", to_string=True)
-      print(insn)
-      if re.search("slti\s+zero,\s*zero,\s*0", insn):
+      if "unimp" in insn:
         break
+      print(insn)
       gdb.execute("si")
       gdb.execute("info registers")
 

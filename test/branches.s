@@ -18,6 +18,6 @@ label1:	addi	s0, s0, 20	# 9
 	beq	x0, x0, bad_loop # 11
 
 end:	add	a0, x0, x0	# 12
-	slti	x0, x0, 0
+	.word	0
 
 	# 0, 3, 4, 9, 10, 6, 7, 12

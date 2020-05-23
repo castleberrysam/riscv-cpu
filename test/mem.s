@@ -4,4 +4,4 @@
 	auipc	s1, 1
 	sw	s0, 40(s1)
 	lw	ra, 40(s1)
-	slti	x0, x0, 0
+	.word	0

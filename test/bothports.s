@@ -3,4 +3,4 @@
 	lw	t0, (t0)
 	jal	t0, label
 
-label:	slti	x0, x0, 0
+label:	.word	0
