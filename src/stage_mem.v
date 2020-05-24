@@ -98,4 +98,10 @@ module stage_mem(
       else
         wb_valid <= wb_stall | (mem_valid & ~mem_stall) | (mem_valid & ~req);
 
+    `ifndef SYNTHESIS
+    always @(posedge clk)
+      if(mem_stall)
+        $display("%d: stage_mem: stalling", $stime);
+    `endif
+
 endmodule

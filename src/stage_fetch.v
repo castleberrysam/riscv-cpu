@@ -51,4 +51,10 @@ module stage_fetch(
       else
         de_valid <= de_stall;
 
+    `ifndef SYNTHESIS
+    always @(posedge clk)
+      if(fe_stall)
+        $display("%d: stage_fetch: stalling", $stime);
+    `endif
+
 endmodule

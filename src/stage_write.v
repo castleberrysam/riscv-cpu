@@ -38,4 +38,10 @@ module stage_write(
         end
     `endif
 
+    `ifndef SYNTHESIS
+    always @(posedge clk)
+      if(wb_stall)
+        $display("%d: stage_wb: stalling", $stime);
+    `endif
+
 endmodule

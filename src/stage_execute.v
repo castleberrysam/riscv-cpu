@@ -166,4 +166,10 @@ module stage_execute(
       else
         mem_valid <= mem_stall | (ex_valid & ~ex_stall);
 
+    `ifndef SYNTHESIS
+    always @(posedge clk)
+      if(ex_stall)
+        $display("%d: stage_execute: stalling", $stime);
+    `endif
+
 endmodule
