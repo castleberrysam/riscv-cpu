@@ -2,27 +2,27 @@
 `default_nettype none
 
 module stage_fetch(
-  input             clk,
-  input             reset_n,
+  input wire         clk,
+  input wire         reset_n,
 
   // inputs from decode stage
-  input             de_stall,
+  input wire         de_stall,
 
   // inputs from mem stage
-  input             fe_enable,
-  input             pc_wen,
-  input [31:0]      pc_in,
+  input wire         fe_enable,
+  input wire         pc_wen,
+  input wire [31:0]  pc_in,
 
   // inputs/outputs to memory
-  output            fe_req,
-  output [31:0]     fe_addr,
-  input             fe_ack,
-  input [31:0]      fe_data,
+  output wire        fe_req,
+  output wire [31:0] fe_addr,
+  input wire         fe_ack,
+  input wire [31:0]  fe_data,
 
   // outputs to decode stage
-  output reg        de_valid,
-  output [31:0]     de_insn,
-  output reg [31:0] de_pc
+  output reg         de_valid,
+  output wire [31:0] de_insn,
+  output reg [31:0]  de_pc
   );
 
     assign de_insn = fe_data;

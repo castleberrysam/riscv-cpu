@@ -2,36 +2,36 @@
 `default_nettype none
 
 module stage_decode(
-  input             clk,
-  input             reset_n,
+  input wire        clk,
+  input wire        reset_n,
 
   // inputs from fetch stage
-  input             de_valid,
-  input [31:0]      de_insn,
-  input [31:0]      de_pc,
+  input wire        de_valid,
+  input wire [31:0] de_insn,
+  input wire [31:0] de_pc,
 
   // inputs from execute stage
-  input             ex_stall,
+  input wire        ex_stall,
 
   // inputs from the forwarding unit
-  input [1:0]       forward_rs1,
-  input [1:0]       forward_rs2,
+  input wire [1:0]  forward_rs1,
+  input wire [1:0]  forward_rs2,
 
   // inputs for forwarding from execute and mem.
-  input [31:0]      ex_forward_data,
-  input [31:0]      mem_forward_data,
+  input wire [31:0] ex_forward_data,
+  input wire [31:0] mem_forward_data,
 
   // inputs from write stage
-  input [4:0]       wb_wreg,
-  input [31:0]      wb_wdata,
-  input             wb_wen,
+  input wire [4:0]  wb_wreg,
+  input wire [31:0] wb_wdata,
+  input wire        wb_wen,
 
   // outputs to fetch stage
-  output            de_stall,
+  output wire       de_stall,
 
   // outputs for forwarding
-  output [4:0]      de_rs1,
-  output [4:0]      de_rs2,
+  output wire [4:0] de_rs1,
+  output wire [4:0] de_rs2,
 
   // outputs to execute stage
   output reg        ex_valid,

@@ -2,24 +2,24 @@
 `default_nettype none
 
 module stage_write(
-  input         clk,
-  input         reset_n,
+  input wire         clk,
+  input wire         reset_n,
 
   // inputs from mem stage
-  input         wb_valid,
+  input wire         wb_valid,
 
-  input [31:0]  wb_pc,
+  input wire [31:0]  wb_pc,
 
-  input [4:0]   wb_reg,
-  input [31:0]  wb_data,
+  input wire [4:0]   wb_reg,
+  input wire [31:0]  wb_data,
 
   // outputs to decode stage
-  output [4:0]  wreg,
-  output [31:0] wdata,
-  output        wen,
+  output wire [4:0]  wreg,
+  output wire [31:0] wdata,
+  output wire        wen,
 
   // outputs to mem stage
-  output        wb_stall
+  output wire        wb_stall
   );
 
     assign wreg = wb_reg;

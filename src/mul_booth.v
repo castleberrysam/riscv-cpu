@@ -2,17 +2,17 @@
 `default_nettype none
 
 module mul_booth(
-  input         clk,
-  input         reset_n,
+  input wire         clk,
+  input wire         reset_n,
 
-  input         go,
-  input         sign0,
-  input         sign1,
-  input [31:0]  m,
-  input [31:0]  r,
+  input wire         go,
+  input wire         sign0,
+  input wire         sign1,
+  input wire [31:0]  m,
+  input wire [31:0]  r,
 
-  output        done,
-  output [63:0] result
+  output wire        done,
+  output wire [63:0] result
   );
 
     reg [33:0] state;

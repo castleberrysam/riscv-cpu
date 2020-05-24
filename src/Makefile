@@ -1,4 +1,4 @@
-SRCS := $(wildcard *.v)
+SRCS := ../test/tb_top.v $(wildcard *.v)
 HDRS := $(wildcard *.vh)
 
 .PHONY: all clean

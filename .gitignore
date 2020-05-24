@@ -3,3 +3,14 @@ src/top
 *.elf
 *.hex
 *.vcd
+
+fpga/*.jou
+fpga/*.log
+fpga/.Xil
+fpga/*.html
+fpga/*.xml
+fpga/*.bit
+fpga/*.mcs
+fpga/*.prm
+fpga/*.mif
+fpga/*.edif

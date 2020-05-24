@@ -2,62 +2,62 @@
 `default_nettype none
 
 module stage_execute(
-  input             clk,
-  input             reset_n,
+  input wire         clk,
+  input wire         reset_n,
 
   // inputs from decode stage
-  input             ex_valid,
+  input wire         ex_valid,
 
-  input [31:0]      ex_pc,
-  input [31:0]      ex_rdata1,
-  input [31:0]      ex_rdata2,
-  input [31:0]      ex_imm,
+  input wire [31:0]  ex_pc,
+  input wire [31:0]  ex_rdata1,
+  input wire [31:0]  ex_rdata2,
+  input wire [31:0]  ex_imm,
 
-  input             ex_use_pc0,
-  input             ex_use_pc1,
-  input             ex_use_imm,
-  input             ex_sub_sra,
-  input [3:0]       ex_op,
+  input wire         ex_use_pc0,
+  input wire         ex_use_pc1,
+  input wire         ex_use_imm,
+  input wire         ex_sub_sra,
+  input wire [3:0]   ex_op,
 
-  input             mem_read,
-  input             mem_write,
-  input             mem_extend,
-  input [1:0]       mem_width,
+  input wire         mem_read,
+  input wire         mem_write,
+  input wire         mem_extend,
+  input wire [1:0]   mem_width,
 
-  input             mem_jmp,
-  input             mem_br,
-  input             mem_br_inv,
+  input wire         mem_jmp,
+  input wire         mem_br,
+  input wire         mem_br_inv,
 
-  input [4:0]       wb_reg,
+  input wire [4:0]   wb_reg,
 
   // inputs from mem stage
-  input             mem_stall,
+  input wire         mem_stall,
 
   // outputs to decode stage
-  output            ex_stall,
+  output wire        ex_stall,
 
   // outputs to forwarding unit
-  output [31:0]     ex_forward_data,
-  output            ex_wen,
+  output wire [31:0] ex_forward_data,
+  output wire        ex_wen,
 
   // outputs to mem stage
-  output reg        mem_valid,
+  output reg         mem_valid,
 
-  output reg [31:0] mem_pc,
+  output reg [31:0]  mem_pc,
 
-  output reg [31:0] mem_data0,
-  output reg [31:0] mem_data1,
+  output reg [31:0]  mem_data0,
+  output reg [31:0]  mem_data1,
 
-  output reg        mem_read_r,
-  output reg        mem_write_r,
-  output reg        mem_extend_r,
-  output reg [1:0]  mem_width_r,
+  output reg         mem_read_r,
+  output reg         mem_write_r,
+  output reg         mem_extend_r,
+  output reg [1:0]   mem_width_r,
 
-  output reg        mem_jmp_r,
-  output reg        mem_br_r,
-  output reg        mem_br_inv_r,
+  output reg         mem_jmp_r,
+  output reg         mem_br_r,
+  output reg         mem_br_inv_r,
 
-  output reg [4:0]  wb_reg_r
+  output reg [4:0]   wb_reg_r
   );
 
     `include "defines.vh"
@@ -79,32 +79,16 @@ module stage_execute(
     wire [31:0] op1 = ex_use_pc0 ? ex_pc : ex_rdata1;
     wire [31:0] op2 = mem_jmp ? 32'd4 : (ex_use_imm ? ex_imm : ex_rdata2);
 
-    `ifndef SLOW_MUL
-    reg mul_go;
-    wire mul_done = 1;
-    reg [63:0] mul_result;
-    always @(*)
-      begin
-          mul_go = 1;
-          case(ex_op)
-            ALUOP_MUL: mul_result = op1 * op2;
-            ALUOP_MULH: mul_result = $signed(op1) * $signed(op2);
-            ALUOP_MULHSU: mul_result = $signed(op1) * $signed({1'b0,op2});
-            ALUOP_MULHU: mul_result = op1 * op2;
-            default:
-              begin
-                  mul_go = 0;
-                  mul_result = 32'b0;
-              end
-          endcase
-      end
-    `else
     wire mul_sign0 = (ex_op == ALUOP_MUL) | (ex_op == ALUOP_MULH);
     wire mul_sign1 = mul_sign0 | (ex_op == ALUOP_MULHSU);
     wire mul_go = ex_valid & (mul_sign1 | (ex_op == ALUOP_MULHU));
     wire mul_done;
     wire [63:0] mul_result;
+    `ifndef SLOW_MUL
+    mul_behav mul(
+    `else
     mul_booth mul(
+    `endif
       .clk(clk),
       .reset_n(reset_n),
 
@@ -117,7 +101,6 @@ module stage_execute(
       .done(mul_done),
       .result(mul_result)
       );
-    `endif
 
    reg [31:0] alu_out;
    always @(*)

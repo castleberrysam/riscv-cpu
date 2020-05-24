@@ -1,4 +1,4 @@
 #!/bin/sh
 
-SRCS=$(find src -type f -name \*.v -not -name tb_\*)
-yosys -p 'proc; hierarchy -check -top top; flatten; opt -full; shell' $SRCS
+SRCS=$(find src -type f -name \*.v)
+yosys -p 'hierarchy -check -top top; proc; flatten; opt -full; shell' $SRCS

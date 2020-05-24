@@ -11,6 +11,9 @@ Yet another RISC-V soft core.
   - xxd
   - qemu-system-riscv32
   - binutils-riscv64-linux-gnu (including gdb)
+- FPGA synthesis
+  - vivado
+  - Board based on XC7S50 chip or similar
 - Misc
   - gtkwave
 
@@ -29,6 +32,8 @@ working directory with a signal trace for the test. You can examine this vcd
 file using gtkwave.
 
 * Synthesis
+TODO update this section for fpga
+
 You can use synth-stats.sh to get the critical path and resource usage prior to
 techology mapping from yosys. Alternatively, you can use run-yosys.sh to load
 the design into an interactive yosys session.
@@ -50,8 +55,8 @@ loads the assembled code at address 0x80000000 and executes it until the invalid
 instruction is encountered. The test shouldn't read or write to memory addresses
 below 0x80000000 since qemu doesn't like it.
 
-* Task list [0/16]
-- [ ] Timing constraints/optimization
+* Task list [2/16]
+- [X] Timing constraints/optimization
 - [ ] Replacement of qemu with spike
 - [ ] Branch prediction
 - [ ] Interrupts/exceptions
@@ -66,7 +71,7 @@ below 0x80000000 since qemu doesn't like it.
 - [ ] Multiple fetch/decode/execute (superscalar)
 - [ ] Out-of-order execution
 - [ ] Verification using SystemVerilog/UVM
-- [ ] Synthesis to FPGA
+- [X] Synthesis to FPGA
 
 # Local Variables:
 # mode: org

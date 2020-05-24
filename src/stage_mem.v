@@ -2,59 +2,59 @@
 `default_nettype none
 
 module stage_mem(
-  input             clk,
-  input             reset_n,
+  input wire         clk,
+  input wire         reset_n,
 
   // inputs from execute stage
-  input             mem_valid,
+  input wire         mem_valid,
 
-  input [31:0]      mem_pc, 
+  input wire [31:0]  mem_pc, 
 
-  input [31:0]      mem_data0,
-  input [31:0]      mem_data1,
+  input wire [31:0]  mem_data0,
+  input wire [31:0]  mem_data1,
 
-  input             mem_read,
-  input             mem_write,
-  input             mem_extend,
-  input [1:0]       mem_width,
+  input wire         mem_read,
+  input wire         mem_write,
+  input wire         mem_extend,
+  input wire [1:0]   mem_width,
 
-  input             mem_jmp,
-  input             mem_br,
-  input             mem_br_inv,
+  input wire         mem_jmp,
+  input wire         mem_br,
+  input wire         mem_br_inv,
 
-  input [4:0]       wb_reg,
+  input wire [4:0]   wb_reg,
 
   // inputs from write stage
-  input             wb_stall,
+  input wire         wb_stall,
 
   // inputs/outputs to memory
-  output            req,
-  output [31:0]     addr,
-  output            write,
-  output [31:0]     data_out,
-  output            extend,
-  output [1:0]      width,
-  input             ack,
-  input [31:0]      data_in,
+  output wire        req,
+  output wire [31:0] addr,
+  output wire        write,
+  output wire [31:0] data_out,
+  output wire        extend,
+  output wire [1:0]  width,
+  input wire         ack,
+  input wire [31:0]  data_in,
 
   // outputs for forwarding
-  output            mem_wen,
+  output wire        mem_wen,
 
   // outputs to fetch stage
-  output            fe_enable,
-  output            pc_wen,
-  output [31:0]     pc,
+  output wire        fe_enable,
+  output wire        pc_wen,
+  output wire [31:0] pc,
 
   // outputs to execute stage
-  output            mem_stall,
+  output wire        mem_stall,
 
   // outputs to write stage
-  output reg        wb_valid,
+  output reg         wb_valid,
 
-  output reg [31:0] wb_pc,
+  output reg [31:0]  wb_pc,
 
-  output reg [4:0]  wb_reg_r,
-  output [31:0]     wb_data
+  output reg [4:0]   wb_reg_r,
+  output wire [31:0] wb_data
   );
 
     assign

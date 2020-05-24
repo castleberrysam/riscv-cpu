@@ -2,24 +2,23 @@
 `default_nettype none
 
 module regfile(
-  input             clk,
-  input             reset_n,
+  input wire        clk,
+  input wire        reset_n,
 
-  input [4:0]       rs1,
+  input wire [4:0]  rs1,
   output reg        rs1_valid,
   output reg [31:0] rs1_data,
 
-  input [4:0]       rs2,
+  input wire [4:0]  rs2,
   output reg        rs2_valid,
   output reg [31:0] rs2_data,
 
-  input [4:0]       rd,
-  input             reserve,
+  input wire [4:0]  rd,
+  input wire        reserve,
 
-  input [4:0]       wreg,
-  input [31:0]      wdata,
-  input             wen
-
+  input wire [4:0]  wreg,
+  input wire [31:0] wdata,
+  input wire        wen
   );
 
     `include "defines.vh"

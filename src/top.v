@@ -2,8 +2,9 @@
 `default_nettype none
 
 module top(
-  input clk,
-  input reset_n
+  input wire clk,
+  input wire reset_n,
+  output wire [31:0] fe_addr
   );
 
     wire        de_stall;
@@ -16,7 +17,7 @@ module top(
     wire [31:0] pc;
 
     wire        fe_req;
-    wire [31:0] fe_addr;
+    //wire [31:0] fe_addr;
     wire        fe_ack;
     wire [31:0] fe_data;
 
