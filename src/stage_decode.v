@@ -237,14 +237,14 @@ module stage_decode(
             mem_br_inv <= funct3[0];
         end
 
-    `ifndef SYNTHESIS
-    always @(posedge clk)
-      if(de_stall)
-        $display("%d: stage_decode: stalling", $stime);
-    `endif
-
     wire error = format[6];
     reg data_pending;
+
+    `ifndef SYNTHESIS
+    always @(posedge clk)
+      if(de_stall & ~error)
+        $display("%d: stage_decode: stalling", $stime);
+    `endif
 
     always @(posedge clk)
       data_pending <= ~rs1_ensured_valid | (~rs2_ensured_valid & ~(format != FORMAT_R) & (opcode != OP_BRANCH));
