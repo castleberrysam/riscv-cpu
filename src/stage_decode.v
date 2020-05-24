@@ -13,6 +13,14 @@ module stage_decode(
   // inputs from execute stage
   input             ex_stall,
 
+  // inputs from the forwarding unit
+  input [1:0]       forward_rs1,
+  input [1:0]       forward_rs2,
+
+  // inputs for forwarding from execute and mem.
+  input [31:0]      ex_forward_data,
+  input [31:0]      mem_forward_data,
+
   // inputs from write stage
   input [4:0]       wb_wreg,
   input [31:0]      wb_wdata,
@@ -20,6 +28,10 @@ module stage_decode(
 
   // outputs to fetch stage
   output            de_stall,
+
+  // outputs for forwarding
+  output [4:0]      de_rs1,
+  output [4:0]      de_rs2,
 
   // outputs to execute stage
   output reg        ex_valid,
@@ -109,6 +121,9 @@ module stage_decode(
     wire [4:0] rs2 = de_insn[24:20];
     wire [4:0] rd = de_insn[11:7];
 
+    assign de_rs1 = rs1;
+    assign de_rs2 = rs2;
+
     wire rs1_valid, rs2_valid;
     wire [31:0] rdata1, rdata2;
     regfile regfile(
@@ -131,11 +146,30 @@ module stage_decode(
       .wen(wb_wen)
       );
 
+    wire rs1_ensured_valid, rs2_ensured_valid;
+    assign rs1_ensured_valid = rs1_valid | (forward_rs1 != NOT_FORWARDING);
+    assign rs2_ensured_valid = rs2_valid | (forward_rs2 != NOT_FORWARDING);
+   
     always @(posedge clk)
       if(!ex_stall)
         begin
-            ex_rdata1 <= rdata1;
-            ex_rdata2 <= rdata2;
+           // FIXME: OOAO
+           case (forward_rs1)
+             NOT_FORWARDING:
+               ex_rdata1 <= rdata1;
+             FORWARDING_EX:
+               ex_rdata1 <= ex_forward_data;
+             FORWARDING_MEM:
+               ex_rdata1 <= mem_forward_data;
+           endcase
+           case (forward_rs2)
+             NOT_FORWARDING:
+               ex_rdata2 <= rdata2;
+             FORWARDING_EX:
+               ex_rdata2 <= ex_forward_data;
+             FORWARDING_MEM:
+               ex_rdata2 <= mem_forward_data;
+           endcase
         end
 
     always @(posedge clk)
@@ -210,7 +244,12 @@ module stage_decode(
     `endif
 
     wire error = format[6];
-    assign de_stall = de_valid & (ex_stall | error | (~rs1_valid | ~rs2_valid));
+    reg data_pending;
+
+    always @(posedge clk)
+      data_pending <= ~rs1_ensured_valid | (~rs2_ensured_valid & ~(format != FORMAT_R) & (opcode != OP_BRANCH));
+
+    assign de_stall = de_valid & (ex_stall | error | data_pending);
     always @(posedge clk)
       if(~reset_n)
         ex_valid <= 0;

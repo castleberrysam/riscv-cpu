@@ -26,7 +26,6 @@ module top(
 
     wire [4:0]  mem_wreg;
     wire [31:0] mem_wdata;
-    wire        mem_wen;
 
     wire [4:0]  wb_wreg;
     wire [31:0] wb_wdata;
@@ -43,6 +42,16 @@ module top(
     wire        ex_use_imm;
     wire        ex_sub_sra;
     wire [3:0]  ex_op;
+
+    wire [4:0]  de_rs1;
+    wire [4:0]  de_rs2;
+
+    wire [1:0]  forward_rs1;
+    wire [1:0]  forward_rs2;
+
+    wire [31:0] ex_forward_data;
+    wire        ex_wen;
+    wire        mem_wen;
 
     wire        mem_read;
     wire        mem_write;
@@ -117,8 +126,16 @@ module top(
       .de_insn(de_insn),
       .de_pc(de_pc),
 
+      .de_rs1(de_rs1),
+      .de_rs2(de_rs2),
+
       .ex_stall(ex_stall),
 
+      .ex_forward_data(ex_forward_data),
+      .mem_forward_data(mem_data0),
+      .forward_rs1(forward_rs1),
+      .forward_rs2(forward_rs2),
+                        
       .wb_wreg(wb_wreg),
       .wb_wdata(wb_wdata),
       .wb_wen(wb_wen),
@@ -164,6 +181,9 @@ module top(
       .ex_use_imm(ex_use_imm),
       .ex_sub_sra(ex_sub_sra),
       .ex_op(ex_op),
+
+      .ex_wen(ex_wen),
+      .ex_forward_data(ex_forward_data),
 
       .mem_read(mem_read),
       .mem_write(mem_write),
@@ -237,6 +257,7 @@ module top(
       .pc(pc),
 
       .mem_stall(mem_stall),
+      .mem_wen(mem_wen),
 
       .wb_valid(wb_valid),
 
@@ -281,6 +302,17 @@ module top(
       .mem_width(mem_width_out),
       .mem_ack(mem_ack),
       .mem_data_out(mem_data_in)
+      );
+   forward_unit forward_unit(
+      .de_rs1(de_rs1),
+      .de_rs2(de_rs2),
+      .ex_rd(wb_reg),
+      .mem_rd(wb_reg_r),
+      .ex_wen(ex_wen),
+      .mem_wen(mem_wen),
+
+      .forward_rs1(forward_rs1),
+      .forward_rs2(forward_rs2)     
       );
 
 endmodule

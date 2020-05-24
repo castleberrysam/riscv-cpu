@@ -37,6 +37,9 @@ module stage_mem(
   input             ack,
   input [31:0]      data_in,
 
+  // outputs for forwarding
+  output            mem_wen,
+
   // outputs to fetch stage
   output            fe_enable,
   output            pc_wen,
@@ -51,7 +54,7 @@ module stage_mem(
   output reg [31:0] wb_pc,
 
   output reg [4:0]  wb_reg_r,
-  output     [31:0] wb_data
+  output [31:0]     wb_data
   );
 
     assign
@@ -61,6 +64,8 @@ module stage_mem(
       data_out = mem_data1,
       extend = mem_extend,
       width = mem_width;
+
+    assign mem_wen = mem_valid & ~(mem_read | mem_write) & (wb_reg != 0);
 
     assign
       fe_enable = mem_valid & (mem_jmp | mem_br),

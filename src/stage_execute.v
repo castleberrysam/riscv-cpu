@@ -36,6 +36,10 @@ module stage_execute(
   // outputs to decode stage
   output            ex_stall,
 
+  // outputs to forwarding unit
+  output [31:0]     ex_forward_data,
+  output            ex_wen,
+
   // outputs to mem stage
   output reg        mem_valid,
 
@@ -115,30 +119,38 @@ module stage_execute(
       );
     `endif
 
+   reg [31:0] alu_out;
+   always @(*)
+     case(ex_op)
+       ALUOP_NOP: alu_out = op2;
+
+       ALUOP_ADD: alu_out = op1 + (ex_sub_sra ? -op2 : op2);
+       ALUOP_AND: alu_out = op1 & op2;
+       ALUOP_OR: alu_out = op1 | op2;
+       ALUOP_XOR: alu_out = op1 ^ op2;
+
+       ALUOP_SEQ: alu_out = {31'd0,op1 == op2};
+       ALUOP_SLT: alu_out = {31'd0,$signed(op1) < $signed(op2)};
+       ALUOP_SLTU: alu_out = {31'd0,op1 < op2};
+
+       ALUOP_SL: alu_out = op1 << op2[4:0];
+       ALUOP_SR:
+         if(ex_sub_sra)
+           alu_out = op1 >>> op2[4:0];
+         else
+           alu_out = op1 >> op2[4:0];
+
+       ALUOP_MUL: alu_out = mul_result[31:0];
+       ALUOP_MULH, ALUOP_MULHSU, ALUOP_MULHU: alu_out = mul_result[63:32];
+     endcase
+
+    assign ex_forward_data = alu_out;
+    // This is basically req from the memory stage.
+    assign ex_wen = ~(mem_read | mem_write) & (wb_reg != 0);
+
     always @(posedge clk)
       if(!mem_stall)
-        case(ex_op)
-          ALUOP_NOP: mem_data0 <= op2;
-
-          ALUOP_ADD: mem_data0 <= op1 + (ex_sub_sra ? -op2 : op2);
-          ALUOP_AND: mem_data0 <= op1 & op2;
-          ALUOP_OR: mem_data0 <= op1 | op2;
-          ALUOP_XOR: mem_data0 <= op1 ^ op2;
-
-          ALUOP_SEQ: mem_data0 <= {31'd0,op1 == op2};
-          ALUOP_SLT: mem_data0 <= {31'd0,$signed(op1) < $signed(op2)};
-          ALUOP_SLTU: mem_data0 <= {31'd0,op1 < op2};
-
-          ALUOP_SL: mem_data0 <= op1 << op2[4:0];
-          ALUOP_SR:
-            if(ex_sub_sra)
-              mem_data0 <= op1 >>> op2[4:0];
-            else
-              mem_data0 <= op1 >> op2[4:0];
-
-          ALUOP_MUL: mem_data0 <= mul_result[31:0];
-          ALUOP_MULH, ALUOP_MULHSU, ALUOP_MULHU: mem_data0 <= mul_result[63:32];
-        endcase
+        mem_data0 <= alu_out;
 
     always @(posedge clk)
       if(!mem_stall)

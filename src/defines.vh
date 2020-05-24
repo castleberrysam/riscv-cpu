@@ -63,6 +63,12 @@ localparam
   STDOUT = 32'h80000001,
   STDERR = 32'h80000002;
 
+// Forwarding
+localparam
+  NOT_FORWARDING    = 2'd0,
+  FORWARDING_EX = 2'd1,
+  FORWARDING_MEM = 2'd2;
+
 // Utility functions
 function [8*5:1] abi_name(
   input [4:0] regnum
