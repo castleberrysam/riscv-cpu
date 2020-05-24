@@ -149,7 +149,7 @@ module stage_decode(
     wire rs1_ensured_valid, rs2_ensured_valid;
     assign rs1_ensured_valid = rs1_valid | (forward_rs1 != NOT_FORWARDING);
     assign rs2_ensured_valid = rs2_valid | (forward_rs2 != NOT_FORWARDING);
-   
+
     always @(posedge clk)
       if(!ex_stall)
         begin
