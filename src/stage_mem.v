@@ -79,8 +79,8 @@ module stage_mem(
     reg [31:0] reg_data;
     always @(posedge clk)
       begin
-         reg_data = mem_data0;
-         use_data_in = (mem_valid & mem_read);
+         reg_data <= mem_data0;
+         use_data_in <= (mem_valid & mem_read);
       end
 
     assign wb_data = use_data_in ? data_in : reg_data;

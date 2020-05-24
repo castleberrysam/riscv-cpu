@@ -135,7 +135,7 @@ module top(
       .mem_forward_data(mem_data0),
       .forward_rs1(forward_rs1),
       .forward_rs2(forward_rs2),
-                        
+
       .wb_wreg(wb_wreg),
       .wb_wdata(wb_wdata),
       .wb_wen(wb_wen),
@@ -312,7 +312,7 @@ module top(
       .mem_wen(mem_wen),
 
       .forward_rs1(forward_rs1),
-      .forward_rs2(forward_rs2)     
+      .forward_rs2(forward_rs2)
       );
 
 endmodule
