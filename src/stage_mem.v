@@ -18,10 +18,6 @@ module stage_mem(
   input wire         mem_extend,
   input wire [1:0]   mem_width,
 
-  input wire         mem_jmp,
-  input wire         mem_br,
-  input wire         mem_br_inv,
-
   input wire [4:0]   wb_reg,
 
   // inputs from write stage
@@ -36,14 +32,6 @@ module stage_mem(
   output wire [1:0]  width,
   input wire         ack,
   input wire [31:0]  data_in,
-
-  // outputs for forwarding
-  output wire        mem_wen,
-
-  // outputs to fetch stage
-  output wire        fe_enable,
-  output wire        pc_wen,
-  output wire [31:0] pc,
 
   // outputs to execute stage
   output wire        mem_stall,
@@ -64,13 +52,6 @@ module stage_mem(
       data_out = mem_data1,
       extend = mem_extend,
       width = mem_width;
-
-    assign mem_wen = mem_valid & ~(mem_read | mem_write) & (wb_reg != 0);
-
-    assign
-      fe_enable = mem_valid & (mem_jmp | mem_br),
-      pc_wen = mem_valid & (mem_jmp | (mem_br & (mem_data0[0] ^ mem_br_inv))),
-      pc = mem_data1;
 
     // When accessing from memory, assign the writeback data to the
     // value fetched from memory. Otherwise, just propagate the data

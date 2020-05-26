@@ -13,20 +13,19 @@ module stage_execute(
   input wire [31:0]  ex_rdata2,
   input wire [31:0]  ex_imm,
 
-  input wire         ex_use_pc0,
-  input wire         ex_use_pc1,
+  input wire         ex_use_pc,
   input wire         ex_use_imm,
   input wire         ex_sub_sra,
   input wire [3:0]   ex_op,
+
+  input wire         ex_br,
+  input wire         ex_br_inv,
+  input wire         ex_br_taken,
 
   input wire         mem_read,
   input wire         mem_write,
   input wire         mem_extend,
   input wire [1:0]   mem_width,
-
-  input wire         mem_jmp,
-  input wire         mem_br,
-  input wire         mem_br_inv,
 
   input wire [4:0]   wb_reg,
 
@@ -36,9 +35,10 @@ module stage_execute(
   // outputs to decode stage
   output wire        ex_stall,
 
+  output wire        ex_br_miss,
+
   // outputs to forwarding unit
   output wire [31:0] ex_forward_data,
-  output wire        ex_wen,
 
   // outputs to mem stage
   output reg         mem_valid,
@@ -53,14 +53,13 @@ module stage_execute(
   output reg         mem_extend_r,
   output reg [1:0]   mem_width_r,
 
-  output reg         mem_jmp_r,
-  output reg         mem_br_r,
-  output reg         mem_br_inv_r,
-
   output reg [4:0]   wb_reg_r
   );
 
     `include "defines.vh"
+
+    wire br_check = ex_valid & ~mem_stall & ex_br;
+    assign ex_br_miss = br_check & (ex_br_inv ^ ex_br_taken ^ cmp_out);
 
     always @(posedge clk)
       if(!mem_stall)
@@ -70,14 +69,11 @@ module stage_execute(
             mem_write_r <= mem_write;
             mem_extend_r <= mem_extend;
             mem_width_r <= mem_width;
-            mem_jmp_r <= mem_jmp;
-            mem_br_r <= mem_br;
-            mem_br_inv_r <= mem_br_inv;
             wb_reg_r <= wb_reg;
         end
 
-    wire [31:0] op1 = ex_use_pc0 ? ex_pc : ex_rdata1;
-    wire [31:0] op2 = mem_jmp ? 32'd4 : (ex_use_imm ? ex_imm : ex_rdata2);
+    wire [31:0] op1 = ex_use_pc ? ex_pc : ex_rdata1;
+    wire [31:0] op2 = ex_use_imm ? ex_imm : ex_rdata2;
 
     wire mul_sign0 = (ex_op == ALUOP_MUL) | (ex_op == ALUOP_MULH);
     wire mul_sign1 = mul_sign0 | (ex_op == ALUOP_MULHSU);
@@ -85,7 +81,7 @@ module stage_execute(
     wire mul_done;
     wire [63:0] mul_result;
     `ifndef SLOW_MUL
-    mul_behav mul(
+    mul_behav #(4) mul(
     `else
     mul_booth mul(
     `endif
@@ -102,45 +98,44 @@ module stage_execute(
       .result(mul_result)
       );
 
-   reg [31:0] alu_out;
-   always @(*)
-     case(ex_op)
-       ALUOP_NOP: alu_out = op2;
+    reg cmp_out;
+    always @(*)
+      case(ex_op)
+        ALUOP_SEQ: cmp_out = ex_rdata1 == op2;
+        ALUOP_SLT: cmp_out = $signed(ex_rdata1) < $signed(op2);
+        ALUOP_SLTU: cmp_out = ex_rdata1 < op2;
+        default: cmp_out = 0;
+      endcase
 
-       ALUOP_ADD: alu_out = op1 + (ex_sub_sra ? -op2 : op2);
-       ALUOP_AND: alu_out = op1 & op2;
-       ALUOP_OR: alu_out = op1 | op2;
-       ALUOP_XOR: alu_out = op1 ^ op2;
+    reg [31:0] alu_out;
+    always @(*)
+      case(ex_op)
+        ALUOP_NOP: alu_out = op2;
 
-       ALUOP_SEQ: alu_out = {31'd0,op1 == op2};
-       ALUOP_SLT: alu_out = {31'd0,$signed(op1) < $signed(op2)};
-       ALUOP_SLTU: alu_out = {31'd0,op1 < op2};
+        ALUOP_ADD: alu_out = op1 + (ex_sub_sra ? -op2 : op2);
+        ALUOP_AND: alu_out = op1 & op2;
+        ALUOP_OR: alu_out = op1 | op2;
+        ALUOP_XOR: alu_out = op1 ^ op2;
 
-       ALUOP_SL: alu_out = op1 << op2[4:0];
-       ALUOP_SR:
-         if(ex_sub_sra)
-           alu_out = op1 >>> op2[4:0];
-         else
-           alu_out = op1 >> op2[4:0];
+        ALUOP_SEQ, ALUOP_SLT, ALUOP_SLTU: alu_out = {31'd0,cmp_out};
 
-       ALUOP_MUL: alu_out = mul_result[31:0];
-       ALUOP_MULH, ALUOP_MULHSU, ALUOP_MULHU: alu_out = mul_result[63:32];
-     endcase
+        ALUOP_SL: alu_out = op1 << op2[4:0];
+        ALUOP_SR: alu_out = ex_sub_sra ? (op1 >>> op2[4:0]) : (op1 >> op2[4:0]);
+
+        ALUOP_MUL: alu_out = mul_result[31:0];
+        ALUOP_MULH, ALUOP_MULHSU, ALUOP_MULHU: alu_out = mul_result[63:32];
+
+        default: alu_out = 32'b0;
+      endcase
 
     assign ex_forward_data = alu_out;
-    // This is basically req from the memory stage.
-    assign ex_wen = ~(mem_read | mem_write) & (wb_reg != 0);
 
     always @(posedge clk)
       if(!mem_stall)
-        mem_data0 <= alu_out;
-
-    always @(posedge clk)
-      if(!mem_stall)
-        if(mem_jmp | mem_br)
-          mem_data1 <= ex_imm + (ex_use_pc1 ? ex_pc : ex_rdata1);
-        else
-          mem_data1 <= ex_rdata2;
+        begin
+            mem_data0 <= alu_out;
+            mem_data1 <= ex_rdata2;
+        end
 
     assign ex_stall = ex_valid & (mem_stall | (mul_go & ~mul_done));
     always @(posedge clk)

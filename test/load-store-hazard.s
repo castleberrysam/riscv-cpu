@@ -1,4 +1,5 @@
 	.text
+	li	t1, 10
 	addi	s0, t5, 60
 	auipc   s0, 0
 	sw	t0, 0(s0)

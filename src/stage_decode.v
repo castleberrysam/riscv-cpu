@@ -13,7 +13,11 @@ module stage_decode(
   // inputs from execute stage
   input wire        ex_stall,
 
+  input wire        ex_br_miss,
+
   // inputs from the forwarding unit
+  input wire        load_stall,
+
   input wire [1:0]  forward_rs1,
   input wire [1:0]  forward_rs2,
 
@@ -29,6 +33,9 @@ module stage_decode(
   // outputs to fetch stage
   output wire       de_stall,
 
+  output reg        de_setpc,
+  output reg [31:0] de_newpc,
+
   // outputs for forwarding
   output wire [4:0] de_rs1,
   output wire [4:0] de_rs2,
@@ -41,20 +48,19 @@ module stage_decode(
   output reg [31:0] ex_rdata2,
   output reg [31:0] ex_imm,
 
-  output reg        ex_use_pc0,
-  output reg        ex_use_pc1,
+  output reg        ex_use_pc,
   output reg        ex_use_imm,
   output reg        ex_sub_sra,
   output reg [3:0]  ex_op,
+
+  output reg        ex_br,
+  output reg        ex_br_inv,
+  output reg        ex_br_taken,
 
   output reg        mem_read,
   output reg        mem_write,
   output reg        mem_extend,
   output reg [1:0]  mem_width,
-
-  output reg        mem_jmp,
-  output reg        mem_br,
-  output reg        mem_br_inv,
 
   output reg [4:0]  wb_reg
   );
@@ -70,9 +76,40 @@ module stage_decode(
       FORMAT_J = 7'b0100000,
       FORMAT_INVALID = 7'b1000000;
 
+    wire br_take = imm[31];
+    wire jalr = opcode == OP_JALR;
+
+    reg [31:0] br_miss_pc;
+    always @(posedge clk)
+      br_miss_pc <= de_pc + (br_take ? 32'd4 : imm);
+
+    // opcode[4]: set for JAL/JALR/B/ECALL/EBREAK
+    // opcode[0]: set for JAL/JALR
+    always @(*)
+      if(ex_br_miss)
+        begin
+            de_setpc = 1;
+            de_newpc = br_miss_pc;
+        end
+      else if(de_valid & opcode[4] & (opcode[0] | br_take))
+        begin
+            de_setpc = 1;
+            de_newpc = (jalr ? rdata1 : de_pc) + imm;
+        end
+      else
+        begin
+            de_setpc = 0;
+            de_newpc = 32'b0;
+        end
+
     always @(posedge clk)
       if(!ex_stall)
-        ex_pc <= de_pc;
+        begin
+            ex_pc <= de_pc;
+            ex_br <= opcode == OP_BRANCH;
+            ex_br_inv <= funct3[0];
+            ex_br_taken <= br_take;
+        end
 
     wire [4:0] opcode = de_insn[6:2];
     reg [6:0] format;
@@ -99,16 +136,20 @@ module stage_decode(
           default: format = FORMAT_INVALID;
         endcase
 
+    reg [31:0] imm;
+    always @(*)
+      case(format)
+        FORMAT_I: imm = {{21{de_insn[31]}},de_insn[30:20]};
+        FORMAT_S: imm = {{21{de_insn[31]}},de_insn[30:25],de_insn[11:7]};
+        FORMAT_B: imm = {{20{de_insn[31]}},de_insn[7],de_insn[30:25],de_insn[11:8],1'b0};
+        FORMAT_U: imm = {de_insn[31:12],12'b0};
+        FORMAT_J: imm = {{12{de_insn[31]}},de_insn[19:12],de_insn[20],de_insn[30:21],1'b0};
+        default: imm = 32'b0;
+      endcase
+
     always @(posedge clk)
       if(!ex_stall)
-        case(format)
-          FORMAT_I: ex_imm <= {{21{de_insn[31]}},de_insn[30:20]};
-          FORMAT_S: ex_imm <= {{21{de_insn[31]}},de_insn[30:25],de_insn[11:7]};
-          FORMAT_B: ex_imm <= {{20{de_insn[31]}},de_insn[7],de_insn[30:25],de_insn[11:8],1'b0};
-          FORMAT_U: ex_imm <= {de_insn[31:12],12'b0};
-          FORMAT_J: ex_imm <= {{12{de_insn[31]}},de_insn[19:12],de_insn[20],de_insn[30:21],1'b0};
-          default: ex_imm <= 32'b0;
-        endcase
+        ex_imm <= (opcode[4] & opcode[0]) ? 32'd4 : imm;
 
     always @(posedge clk)
       if(!ex_stall)
@@ -124,59 +165,51 @@ module stage_decode(
     assign de_rs1 = rs1;
     assign de_rs2 = rs2;
 
-    wire rs1_valid, rs2_valid;
-    wire [31:0] rdata1, rdata2;
+    wire [31:0] rf_rdata1, rf_rdata2;
     regfile regfile(
       .clk(clk),
       .reset_n(reset_n),
       
       .rs1(rs1),
-      .rs1_valid(rs1_valid),
-      .rs1_data(rdata1),
+      .rdata1(rf_rdata1),
 
       .rs2(rs2),
-      .rs2_valid(rs2_valid),
-      .rs2_data(rdata2),
-
-      .rd(rd),
-      .reserve(de_valid & ~de_stall & (opcode != OP_BRANCH) & (opcode != OP_STORE)),
+      .rdata2(rf_rdata2),
 
       .wreg(wb_wreg),
       .wdata(wb_wdata),
       .wen(wb_wen)
       );
 
-    wire rs1_ensured_valid, rs2_ensured_valid;
-    assign rs1_ensured_valid = rs1_valid | (forward_rs1 != NOT_FORWARDING);
-    assign rs2_ensured_valid = rs2_valid | (forward_rs2 != NOT_FORWARDING);
+    reg [31:0] rdata1, rdata2;
+    always @(*)
+      begin
+          if((forward_rs1 == FORWARDING_EX) & ~jalr)
+            rdata1 = ex_forward_data;
+          else if(forward_rs1 == FORWARDING_MEM)
+            rdata1 = mem_forward_data;
+          else
+            rdata1 = rf_rdata1;
+
+          if(forward_rs2 == FORWARDING_EX)
+            rdata2 = ex_forward_data;
+          else if(forward_rs2 == FORWARDING_MEM)
+            rdata2 = mem_forward_data;
+          else
+            rdata2 = rf_rdata2;
+      end
 
     always @(posedge clk)
       if(!ex_stall)
         begin
-           // FIXME: OOAO
-           case (forward_rs1)
-             NOT_FORWARDING:
-               ex_rdata1 <= rdata1;
-             FORWARDING_EX:
-               ex_rdata1 <= ex_forward_data;
-             FORWARDING_MEM:
-               ex_rdata1 <= mem_forward_data;
-           endcase
-           case (forward_rs2)
-             NOT_FORWARDING:
-               ex_rdata2 <= rdata2;
-             FORWARDING_EX:
-               ex_rdata2 <= ex_forward_data;
-             FORWARDING_MEM:
-               ex_rdata2 <= mem_forward_data;
-           endcase
+            ex_rdata1 <= rdata1;
+            ex_rdata2 <= rdata2;
         end
 
     always @(posedge clk)
       if(!ex_stall)
         begin
-            ex_use_pc0 <= (opcode == OP_JAL) | (opcode == OP_AUIPC);
-            ex_use_pc1 <= (opcode == OP_JAL) | (opcode == OP_BRANCH);
+            ex_use_pc <= (opcode == OP_JAL) | (opcode == OP_JALR) | (opcode == OP_AUIPC);
             ex_use_imm <= (format != FORMAT_R) & (opcode != OP_BRANCH);
             ex_sub_sra <= (opcode == OP_OP) & funct7[5];
         end
@@ -229,31 +262,20 @@ module stage_decode(
             mem_width <= funct3[1:0];
         end
 
-    always @(posedge clk)
-      if(!ex_stall)
-        begin
-            mem_jmp <= opcode == OP_JAL || opcode == OP_JALR;
-            mem_br <= opcode == OP_BRANCH;
-            mem_br_inv <= funct3[0];
-        end
-
-    wire error = format[6];
-    reg data_pending;
-
     `ifndef SYNTHESIS
     always @(posedge clk)
       if(de_stall & ~error)
         $display("%d: stage_decode: stalling", $stime);
     `endif
 
-    always @(posedge clk)
-      data_pending <= ~rs1_ensured_valid | (~rs2_ensured_valid & ~(format != FORMAT_R) & (opcode != OP_BRANCH));
+    wire jalr_stall = jalr & (forward_rs1 == FORWARDING_EX);
 
-    assign de_stall = de_valid & (ex_stall | error | data_pending);
+    wire error = format[6];
+    assign de_stall = de_valid & (ex_stall | error | jalr_stall | load_stall);
     always @(posedge clk)
       if(~reset_n)
         ex_valid <= 0;
       else
-        ex_valid <= ex_stall | (de_valid & ~de_stall);
+        ex_valid <= ex_stall | (de_valid & ~de_stall & ~ex_br_miss);
 
 endmodule

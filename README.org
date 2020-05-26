@@ -55,10 +55,13 @@ loads the assembled code at address 0x80000000 and executes it until the invalid
 instruction is encountered. The test shouldn't read or write to memory addresses
 below 0x80000000 since qemu doesn't like it.
 
-* Task list [2/16]
+* Task list [3/16]
 - [X] Timing constraints/optimization
+  - Current target: 80MHz
 - [ ] Replacement of qemu with spike
-- [ ] Branch prediction
+- [X] Branch prediction
+  - Backward predicted taken, forward predicted not taken
+  - 1 cycle miss penalty
 - [ ] Interrupts/exceptions
 - [ ] Integer division
 - [ ] Memory mapped I/O (peripherals)

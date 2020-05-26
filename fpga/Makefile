@@ -1,16 +1,22 @@
 SRCS := top_fpga.v $(wildcard ../src/*.v)
 
-.PHONY: all yosys prog flash clean
+.PHONY: all elab timing yosys prog flash clean
 
 all: top.bit
 
-top.bit: $(SRCS) sram.mif constraints.xdc synth.tcl
-	vivado -nojou -mode batch -source synth.tcl
+top.bit: $(SRCS) sram.mif constraints.xdc synth_full.tcl
+	vivado -nojou -mode batch -source synth_full.tcl
+
+elab: $(SRCS) elab.tcl
+	vivado -nojou -mode tcl -source elab.tcl
+
+timing: $(SRCS) sram.mif constraints.xdc synth_timing.tcl
+	vivado -nojou -mode batch -source synth_timing.tcl
 
 yosys: top_yosys.bit
 
-top_yosys.bit: top_fpga.edif sram.mif constraints.xdc synth_yosys.tcl
-	vivado -nojou -mode batch -source synth_yosys.tcl
+top_yosys.bit: top_fpga.edif sram.mif constraints.xdc synth_full_yosys.tcl
+	vivado -nojou -mode batch -source synth_full_yosys.tcl
 
 top_fpga.edif: $(SRCS)
 	yosys -DSLOW_MUL -p 'synth_xilinx -top top_fpga; write_edif -top top_fpga top_fpga.edif' $(SRCS)
@@ -25,7 +31,7 @@ top_fpga.edif: $(SRCS)
 	riscv64-linux-gnu-as -march=rv32im -o $@ $<
 
 clean:
-	-rm -r *.bit *.mcs *.prm *.jou *.log *.html *.xml *.str .Xil/
+	-rm -r *.bit *.edif *.mcs *.prm *.jou *.log *.html *.xml *.str .Xil/
 
 prog: top.bit prog_fpga.tcl
 	vivado -nojou -mode batch -source prog_fpga.tcl
