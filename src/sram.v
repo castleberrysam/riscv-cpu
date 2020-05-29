@@ -25,11 +25,12 @@ module sram(
     reg [31:0] storage[0:DEPTH-1];
 
     // init data
+    `ifdef SYNTHESIS
     `ifdef XILINX
     initial
       $readmemb("sram.mif", storage);
+    `endif
     `else
-    `ifndef SYNTHESIS
     integer j;
     reg [8*32:1] memfile;
     reg [31:0] fd;
@@ -52,7 +53,6 @@ module sram(
 
           $readmemh(memfile, storage);
       end
-    `endif
     `endif
 
     // read port

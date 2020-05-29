@@ -30,9 +30,6 @@ top_fpga.edif: $(SRCS)
 %.o: %.s
 	riscv64-linux-gnu-as -march=rv32im -o $@ $<
 
-clean:
-	-rm -r *.bit *.edif *.mcs *.prm *.jou *.log *.html *.xml *.str .Xil/
-
 prog: top.bit prog_fpga.tcl
 	vivado -nojou -mode batch -source prog_fpga.tcl
 
@@ -41,3 +38,6 @@ flash: top.mcs top.prm prog_flash.tcl
 
 top.mcs top.prm &: top.bit gen_mcs.tcl
 	vivado -nojou -mode batch -source gen_mcs.tcl
+
+clean:
+	-rm -r *.o *.bin *.mif *.bit *.edif *.mcs *.prm *.jou *.log *.html *.xml *.str .Xil/

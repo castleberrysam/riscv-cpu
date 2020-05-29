@@ -6,4 +6,4 @@ if [ $# -lt 1 ]; then
 fi
 
 make >/dev/null || exit $?
-vvp src/top +memfile="test/$1.hex"
+sim/axsim.sh --testplusarg memfile="../test/$1.hex"

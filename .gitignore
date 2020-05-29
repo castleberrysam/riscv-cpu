@@ -1,8 +1,16 @@
 doc/
-src/top
+*.o
+*.bin
 *.elf
 *.hex
 *.vcd
+
+sim/*.jou
+sim/*.log
+sim/*.pb
+sim/.Xil
+sim/xsim.dir
+sim/axsim.sh
 
 fpga/*.jou
 fpga/*.log

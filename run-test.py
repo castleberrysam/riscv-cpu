@@ -57,12 +57,12 @@ class Insn:
     def __eq__(self, other):
         return self.addr == other.addr and self.regvals == other.regvals
 
-def run_iverilog(vvp_file, hex_file):
-    process = Popen(["vvp", vvp_file, "+memfile=" + hex_file], stdout=PIPE)
+def run_xsim(hex_file):
+    process = Popen(["sim/axsim.sh", "--testplusarg", "memfile=" + hex_file], stdout=PIPE)
     try:
         result = process.communicate(timeout=3)[0].decode()
     except TimeoutExpired:
-        print("iverilog timed out")
+        print("xsim timed out")
         return None
     finally:
         process.kill()
@@ -180,18 +180,18 @@ def main():
         if not qemu_insns:
             continue
 
-        iverilog_insns = run_iverilog("src/top", "test/" + test + ".hex")
-        if not iverilog_insns:
+        xsim_insns = run_xsim("../test/" + test + ".hex")
+        if not xsim_insns:
             continue
 
-        print("pass" if qemu_insns == iverilog_insns else "fail")
+        print("pass" if qemu_insns == xsim_insns else "fail")
 
         if verbose:
             print("from qemu:")
             for insn in qemu_insns:
                 print(insn)
-            print("from iverilog:")
-            for insn in iverilog_insns:
+            print("from xsim:")
+            for insn in xsim_insns:
                 print(insn)
 
 if __name__ == "__main__":
