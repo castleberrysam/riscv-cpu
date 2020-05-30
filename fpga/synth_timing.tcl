@@ -1,4 +1,4 @@
-read_verilog top_fpga.v [glob ../src/*.v]
+read_verilog top_fpga.sv [glob ../src/*.sv]
 read_mem sram.mif
 read_xdc constraints.xdc
 

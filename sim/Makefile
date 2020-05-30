@@ -1,4 +1,4 @@
-SRCS := ../test/tb_top.v $(wildcard ../src/*.v)
+SRCS := ../test/tb_top.sv $(wildcard ../src/*.sv)
 HDRS := $(wildcard ../src/*.vh)
 
 .PHONY: all run clean
@@ -10,7 +10,7 @@ axsim.sh: xsim.dir/work/work.rlx
 	sed -i -e '5i cd "$${BASH_SOURCE%/*}"' axsim.sh
 
 xsim.dir/work/work.rlx: $(SRCS) $(HDRS)
-	xvlog --relax -d XILINX $(SRCS)
+	xvlog --sv --relax -d XILINX $(SRCS)
 
 clean:
 	-rm -r axsim.sh *.jou *.log *.pb .Xil/ xsim.dir/

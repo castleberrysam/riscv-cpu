@@ -1,4 +1,4 @@
-SRCS := top_fpga.v $(wildcard ../src/*.v)
+SRCS := top_fpga.sv $(wildcard ../src/*.sv)
 
 .PHONY: all elab timing yosys prog flash clean
 

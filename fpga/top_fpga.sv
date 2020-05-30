@@ -1,15 +1,14 @@
 `timescale 1ns/1ps
-`default_nettype none
 
 module top_fpga(
-  input wire        CLK100MHZ,
-  input wire [3:0]  btn,
-  output wire [3:0] led
+  input logic        CLK100MHZ,
+  input logic [3:0]  btn,
+  output logic [3:0] led
   );
 
-    wire locked;
-    wire clkfb;
-    wire clk80mhz;
+    logic locked;
+    logic clkfb;
+    logic clk80mhz;
     PLLE2_BASE #(
       .CLKIN1_PERIOD(10.000),
       .STARTUP_WAIT("TRUE"),

@@ -1,11 +1,10 @@
 `timescale 1ns/1ps
-`default_nettype none
 
 module tb_top(
   );
 
-    reg clk;
-    reg reset_n;
+    logic clk;
+    logic reset_n;
 
     top uut(
       .clk(clk),
