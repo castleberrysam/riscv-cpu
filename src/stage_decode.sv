@@ -47,6 +47,7 @@ module stage_decode(
   output logic        ex_use_pc,
   output logic        ex_use_imm,
   output logic        ex_sub_sra,
+  output logic [1:0]  ex_csr_write,
   output logic [3:0]  ex_op,
 
   output logic        ex_br,
@@ -81,13 +82,14 @@ module stage_decode(
   always_ff @(posedge clk)
     br_miss_pc <= de_pc + (br_take ? 32'd4 : imm);
 
-  // opcode[4]: set for JAL/JALR/B/ECALL/EBREAK
+  // opcode[4]: set for JAL/JALR/B/ECALL/EBREAK/CSR*
+  // opcode[2]: set for ECALL/EBREAK/CSR*
   // opcode[0]: set for JAL/JALR
   always_comb
     if(ex_br_miss) begin
       de_setpc = 1;
       de_newpc = br_miss_pc;
-    end else if(de_valid & opcode[4] & (opcode[0] | br_take)) begin
+    end else if(de_valid & opcode[4] & ~opcode[2] & (opcode[0] | br_take)) begin
       de_setpc = 1;
       de_newpc = (jalr ? rdata1 : de_pc) + imm;
     end else begin
@@ -142,7 +144,7 @@ module stage_decode(
 
   always_ff @(posedge clk)
     if(!ex_stall)
-      ex_imm <= (opcode[4] & opcode[0]) ? 32'd4 : imm;
+      ex_imm <= (opcode[4] & ~opcode[2] & opcode[0]) ? 32'd4 : imm;
 
   always_ff @(posedge clk)
     if(!ex_stall)
@@ -201,8 +203,10 @@ module stage_decode(
   always_ff @(posedge clk)
     if(!ex_stall) begin
       ex_use_pc <= (opcode == OP_JAL) | (opcode == OP_JALR) | (opcode == OP_AUIPC);
-      ex_use_imm <= (format != FORMAT_R) & (opcode != OP_BRANCH);
+      ex_use_imm <= (opcode == OP_SYSTEM) ? funct3[2] :
+                    (format != FORMAT_R) & (opcode != OP_BRANCH);
       ex_sub_sra <= (opcode == OP_OP) & funct7[5];
+      ex_csr_write <= |rs1 ? funct3[1:0] : 2'b00;
     end
 
   logic [2:0] funct3;
@@ -244,7 +248,8 @@ module stage_decode(
             2'b11: ex_op <= ALUOP_SLTU;
           endcase
 
-        OP_MISC_MEM, OP_SYSTEM: ex_op <= ALUOP_NOP;
+        OP_MISC_MEM: ex_op <= ALUOP_NOP;
+        OP_SYSTEM: ex_op <= ALUOP_CSR;
       endcase
 
   always_ff @(posedge clk)

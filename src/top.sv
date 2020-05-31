@@ -42,6 +42,7 @@ module top(
   logic        ex_use_pc;
   logic        ex_use_imm;
   logic        ex_sub_sra;
+  logic [1:0]  ex_csr_write;
   logic [3:0]  ex_op;
 
   logic        ex_br;
@@ -152,6 +153,7 @@ module top(
     .ex_use_pc(ex_use_pc),
     .ex_use_imm(ex_use_imm),
     .ex_sub_sra(ex_sub_sra),
+    .ex_csr_write(ex_csr_write),
     .ex_op(ex_op),
 
     .ex_br(ex_br),
@@ -179,6 +181,7 @@ module top(
     .ex_use_pc(ex_use_pc),
     .ex_use_imm(ex_use_imm),
     .ex_sub_sra(ex_sub_sra),
+    .ex_csr_write(ex_csr_write),
     .ex_op(ex_op),
 
     .ex_br(ex_br),
@@ -195,6 +198,8 @@ module top(
     .wb_reg(wb_reg),
 
     .mem_stall(mem_stall),
+
+    .wb_valid(wb_valid),
 
     .ex_br_miss(ex_br_miss),
 

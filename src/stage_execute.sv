@@ -15,6 +15,7 @@ module stage_execute(
   input logic         ex_use_pc,
   input logic         ex_use_imm,
   input logic         ex_sub_sra,
+  input logic [1:0]   ex_csr_write,
   input logic [3:0]   ex_op,
 
   input logic         ex_br,
@@ -30,6 +31,9 @@ module stage_execute(
 
   // inputs from mem stage
   input logic         mem_stall,
+
+  // inputs from write stage
+  input logic         wb_valid,
 
   // outputs to decode stage
   output logic        ex_stall,
@@ -98,6 +102,20 @@ module stage_execute(
     .result(mul_result)
     );
 
+  logic [31:0] csr_out;
+  csr csr(
+    .clk(clk),
+    .reset_n(reset_n),
+
+    .inc_instret(wb_valid),
+
+    .addr(ex_imm[11:0]),
+    .write(ex_csr_write),
+    .data_in(ex_use_imm ? ex_imm : ex_rdata1),
+
+    .data_out(csr_out)
+    );
+
   logic cmp_out;
   always_comb
     case(ex_op)
@@ -124,6 +142,8 @@ module stage_execute(
 
       ALUOP_MUL: alu_out = mul_result[31:0];
       ALUOP_MULH, ALUOP_MULHSU, ALUOP_MULHU: alu_out = mul_result[63:32];
+
+      ALUOP_CSR: alu_out = csr_out;
 
       default: alu_out = 32'b0;
     endcase
