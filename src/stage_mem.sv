@@ -108,6 +108,8 @@ module stage_mem(
         ecause = mem_write ? SALIGN : LALIGN;
       else if(error)
         ecause = mem_write ? SFAULT : LFAULT;
+      else if(csr_access & csr_error)
+        ecause = IILLEGAL;
       else
         exc = 0;
     end else

@@ -37,10 +37,6 @@ module csr(
   always_ff @(posedge clk)
     if(~reset_n)
       cycle <= 0;
-    else if(wen && (addr == 'hc00 || addr == 'hc01))
-      cycle[31:0] <= wdata;
-    else if(wen && (addr == 'hc80 || addr == 'hc81))
-      cycle[63:32] <= wdata;
     else
       cycle <= cycle + 1;
 
@@ -48,10 +44,6 @@ module csr(
   always_ff @(posedge clk)
     if(~reset_n)
       instret <= 0;
-    else if(wen && addr == 'hc02)
-      instret[31:0] <= wdata;
-    else if(wen && addr == 'hc82)
-      instret[63:32] <= wdata;
     else if(wb_valid)
       instret <= instret + 1;
 
@@ -143,7 +135,9 @@ module csr(
   end
 
   // read port
-  always_comb
+  logic unimp;
+  always_comb begin
+    unimp = 0;
     unique case(addr)
       'h300: data_out = mstatus;
       'h305: data_out = mtvec;
@@ -158,7 +152,13 @@ module csr(
       'hc80: data_out = cycle[63:32];
       'hc81: data_out = cycle[63:32];
       'hc82: data_out = instret[63:32];
-      default: data_out = 0;
+      default: begin
+        unimp = 1;
+        data_out = 0;
+      end
     endcase
+  end
+
+  assign error = unimp | (wen & addr[11] & addr[10]);
 
 endmodule
