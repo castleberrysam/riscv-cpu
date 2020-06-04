@@ -311,9 +311,11 @@ module stage_decode(
   assign test_stop = 0;
 `endif
 
-  logic ecall, ebreak;
-  assign ecall = (opcode == SYSTEM) & ~|funct3[1:0] & ~de_insn[20];
-  assign ebreak = (opcode == SYSTEM) & ~|funct3[1:0] & de_insn[20];
+  logic special, ecall, ebreak, eret;
+  assign special = (opcode == SYSTEM) & ~|funct3[1:0];
+  assign ecall  = special & (rs2[1:0] == 'b00);
+  assign ebreak = special & (rs2[1:0] == 'b01);
+  assign eret   = special & (rs2[1:0] == 'b10);
 
   logic exc;
   ecause_t ecause;
@@ -330,6 +332,8 @@ module stage_decode(
       ecause = EBREAK;
     else if(de_valid & ecall)
       ecause = MCALL;
+    else if(de_valid & eret)
+      ecause = ERET;
     else
       exc = 0;
   end

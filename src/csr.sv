@@ -47,6 +47,9 @@ module csr(
     else if(wb_valid)
       instret <= instret + 1;
 
+  logic eret;
+  assign eret = wb_exc_cause == ERET;
+
   // since we currently only have M mode, we only need to implement:
   // MIE (bit 3)
   // MPIE (bit 7)
@@ -59,10 +62,14 @@ module csr(
     else if(wen && addr == 'h300) begin
       mstatus[3] <= wdata[3];
       mstatus[7] <= wdata[7];
-    end else if(wb_exc) begin
-      mstatus[3] <= 0;
-      mstatus[7] <= mstatus[3];
-    end
+    end else if(wb_exc)
+      if(~eret) begin
+        mstatus[3] <= 0;
+        mstatus[7] <= mstatus[3];
+      end else begin
+        mstatus[3] <= mstatus[7];
+        mstatus[7] <= 1;
+      end
 
   logic [31:0] mtvec;
   always_ff @(posedge clk)
@@ -87,7 +94,7 @@ module csr(
       mepc <= 0;
     else if(wen && addr == 'h341)
       mepc <= wdata[31:2];
-    else if(wb_exc)
+    else if(wb_exc & ~eret)
       mepc <= wb_pc;
 
   logic [31:0] mcause;
@@ -102,14 +109,14 @@ module csr(
         mcause[4:0] <= wdata[4:0];
       else
         mcause[3:0] <= wdata[3:0];
-    end else if(wb_exc) begin
+    end else if(wb_exc & ~eret) begin
       mcause <= 0;
       mcause[3:0] <= wb_exc_cause;
     end
 
   logic [31:0] exc_tval;
   always_comb
-    unique0 case(wb_exc_cause)
+    unique case(wb_exc_cause)
       IALIGN, IFAULT, IPFAULT: exc_tval = wb_pc;
       IILLEGAL: exc_tval = wb_data;
 
@@ -118,6 +125,8 @@ module csr(
 
       UCALL, SCALL, MCALL: exc_tval = 0;
       EBREAK: exc_tval = wb_pc;
+
+      default: exc_tval = 0;
     endcase
 
   logic [31:0] mtval;
@@ -126,12 +135,12 @@ module csr(
       mtval <= 0;
     else if(wen && addr == 'h343)
       mtval <= wdata;
-    else if(wb_exc)
+    else if(wb_exc & ~eret)
       mtval <= exc_tval;
 
   always_comb begin
     csr_setpc = wb_exc;
-    csr_newpc = mtvec[31:2];
+    csr_newpc = ~eret ? mtvec[31:2] : mepc;
   end
 
   // read port
@@ -142,7 +151,7 @@ module csr(
       'h300: data_out = mstatus;
       'h305: data_out = mtvec;
       'h340: data_out = mscratch;
-      'h341: data_out = mepc;
+      'h341: data_out = {mepc,2'b0};
       'h342: data_out = mcause;
       'h343: data_out = mtval;
 
