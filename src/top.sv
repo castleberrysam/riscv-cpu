@@ -11,30 +11,41 @@ module top(
   logic        wb_stall;
 
   logic        de_setpc;
-  logic [31:0] de_newpc;
+  logic [31:2] de_newpc;
+
+  logic        csr_setpc;
+  logic [31:2] csr_newpc;
 
   logic        ex_br_miss;
 
   logic        fe_req;
-  logic [31:0] fe_addr;
+  logic [31:2] fe_addr;
   logic        fe_ack;
+  logic        fe_error;
   logic [31:0] fe_data;
 
   logic        de_valid;
+  logic        de_exc;
   logic [31:0] de_insn;
-  logic [31:0] de_pc;
+  logic [31:2] de_pc;
 
-  logic        load_stall;
+  logic        fwd_stall;
+  fwd_type_t   fwd_rs1;
+  fwd_type_t   fwd_rs2;
 
-  logic [1:0]  forward_rs1;
-  logic [1:0]  forward_rs2;
-
+  logic        wb_exc;
   logic [4:0]  wb_wreg;
   logic [31:0] wb_wdata;
   logic        wb_wen;
 
+  logic [4:0]  de_rs1;
+  logic [4:0]  de_rs2;
+
   logic        ex_valid;
-  logic [31:0] ex_pc;
+  logic        ex_exc;
+  ecause_t     ex_exc_cause;
+
+  logic [31:2] ex_pc;
   logic [31:0] ex_rdata1;
   logic [31:0] ex_rdata2;
   logic [31:0] ex_imm;
@@ -42,15 +53,15 @@ module top(
   logic        ex_use_pc;
   logic        ex_use_imm;
   logic        ex_sub_sra;
-  logic [1:0]  ex_csr_write;
-  logic [3:0]  ex_op;
+  logic        ex_data1_sel;
+  aluop_t      ex_op;
 
   logic        ex_br;
   logic        ex_br_inv;
   logic        ex_br_taken;
 
-  logic [4:0]  de_rs1;
-  logic [4:0]  de_rs2;
+  logic        ex_br_misalign;
+  logic        ex_br_miss_misalign;
 
   logic [31:0] ex_forward_data;
   logic        ex_wen;
@@ -64,8 +75,10 @@ module top(
   logic [4:0]  wb_reg;
 
   logic        mem_valid;
+  logic        mem_exc;
+  ecause_t     mem_exc_cause;
 
-  logic [31:0] mem_pc;
+  logic [31:2] mem_pc;
 
   logic [31:0] mem_data0;
   logic [31:0] mem_data1;
@@ -84,11 +97,19 @@ module top(
   logic        mem_extend_out;
   logic [1:0]  mem_width_out;
   logic        mem_ack;
+  logic        mem_error;
   logic [31:0] mem_data_in;
 
-  logic        wb_valid;
+  logic [11:0] csr_addr;
+  logic [1:0]  csr_write;
+  logic [31:0] csr_data_out;
+  logic        csr_error;
+  logic [31:0] csr_data_in;
 
-  logic [31:0] wb_pc;
+  logic        wb_valid;
+  ecause_t     wb_exc_cause;
+
+  logic [31:2] wb_pc;
 
   logic [4:0]  wb_reg_r_r;
   logic [31:0] wb_data;
@@ -98,18 +119,22 @@ module top(
     .reset_n(reset_n),
 
     .de_stall(de_stall),
-
     .de_setpc(de_setpc),
     .de_newpc(de_newpc),
+
+    .csr_setpc(csr_setpc),
+    .csr_newpc(csr_newpc),
 
     .fe_req(fe_req),
     .fe_addr(fe_addr),
     .fe_ack(fe_ack),
+    .fe_error(fe_error),
     .fe_data(fe_data),
 
     .de_valid(de_valid),
-    .de_insn(de_insn),
-    .de_pc(de_pc)
+    .de_exc(de_exc),
+    .de_pc(de_pc),
+    .de_insn(de_insn)
     );
 
   stage_decode decode(
@@ -117,34 +142,36 @@ module top(
     .reset_n(reset_n),
 
     .de_valid(de_valid),
+    .de_exc(de_exc),
     .de_insn(de_insn),
     .de_pc(de_pc),
 
-    .de_rs1(de_rs1),
-    .de_rs2(de_rs2),
-
     .ex_stall(ex_stall),
-
     .ex_br_miss(ex_br_miss),
 
-    .load_stall(load_stall),
-
-    .forward_rs1(forward_rs1),
-    .forward_rs2(forward_rs2),
+    .fwd_stall(fwd_stall),
+    .fwd_rs1(fwd_rs1),
+    .fwd_rs2(fwd_rs2),
 
     .ex_forward_data(ex_forward_data),
     .mem_forward_data(mem_data0),
 
+    .wb_exc(wb_exc),
     .wb_wreg(wb_wreg),
     .wb_wdata(wb_wdata),
     .wb_wen(wb_wen),
 
     .de_stall(de_stall),
-
     .de_setpc(de_setpc),
     .de_newpc(de_newpc),
 
+    .de_rs1(de_rs1),
+    .de_rs2(de_rs2),
+
     .ex_valid(ex_valid),
+    .ex_exc(ex_exc),
+    .ex_exc_cause(ex_exc_cause),
+
     .ex_pc(ex_pc),
     .ex_rdata1(ex_rdata1),
     .ex_rdata2(ex_rdata2),
@@ -153,12 +180,15 @@ module top(
     .ex_use_pc(ex_use_pc),
     .ex_use_imm(ex_use_imm),
     .ex_sub_sra(ex_sub_sra),
-    .ex_csr_write(ex_csr_write),
+    .ex_data1_sel(ex_data1_sel),
     .ex_op(ex_op),
 
     .ex_br(ex_br),
     .ex_br_inv(ex_br_inv),
     .ex_br_taken(ex_br_taken),
+
+    .ex_br_misalign(ex_br_misalign),
+    .ex_br_miss_misalign(ex_br_miss_misalign),
 
     .mem_read(mem_read),
     .mem_write(mem_write),
@@ -173,6 +203,9 @@ module top(
     .reset_n(reset_n),
 
     .ex_valid(ex_valid),
+    .ex_exc(ex_exc),
+    .ex_exc_cause(ex_exc_cause),
+
     .ex_pc(ex_pc),
     .ex_rdata1(ex_rdata1),
     .ex_rdata2(ex_rdata2),
@@ -181,14 +214,15 @@ module top(
     .ex_use_pc(ex_use_pc),
     .ex_use_imm(ex_use_imm),
     .ex_sub_sra(ex_sub_sra),
-    .ex_csr_write(ex_csr_write),
+    .ex_data1_sel(ex_data1_sel),
     .ex_op(ex_op),
 
     .ex_br(ex_br),
     .ex_br_inv(ex_br_inv),
     .ex_br_taken(ex_br_taken),
 
-    .ex_forward_data(ex_forward_data),
+    .ex_br_misalign(ex_br_misalign),
+    .ex_br_miss_misalign(ex_br_miss_misalign),
 
     .mem_read(mem_read),
     .mem_write(mem_write),
@@ -199,13 +233,16 @@ module top(
 
     .mem_stall(mem_stall),
 
-    .wb_valid(wb_valid),
-
-    .ex_br_miss(ex_br_miss),
+    .wb_exc(wb_exc),
 
     .ex_stall(ex_stall),
+    .ex_br_miss(ex_br_miss),
+
+    .ex_forward_data(ex_forward_data),
 
     .mem_valid(mem_valid),
+    .mem_exc(mem_exc),
+    .mem_exc_cause(mem_exc_cause),
 
     .mem_pc(mem_pc),
 
@@ -225,6 +262,8 @@ module top(
     .reset_n(reset_n),
 
     .mem_valid(mem_valid),
+    .mem_exc(mem_exc),
+    .mem_exc_cause(mem_exc_cause),
 
     .mem_pc(mem_pc),
 
@@ -247,11 +286,20 @@ module top(
     .extend(mem_extend_out),
     .width(mem_width_out),
     .ack(mem_ack),
+    .error(mem_error),
     .data_in(mem_data_in),
+
+    .csr_addr(csr_addr),
+    .csr_write(csr_write),
+    .csr_data_out(csr_data_in),
+    .csr_error(csr_error),
+    .csr_data_in(csr_data_out),
 
     .mem_stall(mem_stall),
 
     .wb_valid(wb_valid),
+    .wb_exc(wb_exc),
+    .wb_exc_cause(wb_exc_cause),
 
     .wb_pc(wb_pc),
 
@@ -264,6 +312,7 @@ module top(
     .reset_n(reset_n),
 
     .wb_valid(wb_valid),
+    .wb_exc(wb_exc),
 
     .wb_pc(wb_pc),
 
@@ -284,6 +333,7 @@ module top(
     .fe_req(fe_req),
     .fe_addr(fe_addr),
     .fe_ack(fe_ack),
+    .fe_error(fe_error),
     .fe_data(fe_data),
 
     .mem_req(mem_req),
@@ -293,6 +343,7 @@ module top(
     .mem_extend(mem_extend_out),
     .mem_width(mem_width_out),
     .mem_ack(mem_ack),
+    .mem_error(mem_error),
     .mem_data_out(mem_data_in)
     );
 
@@ -308,10 +359,29 @@ module top(
     .mem_read_r(mem_read_r),
     .mem_rd(wb_reg_r),
 
-    .load_stall(load_stall),
+    .fwd_stall(fwd_stall),
 
-    .forward_rs1(forward_rs1),
-    .forward_rs2(forward_rs2)
+    .fwd_rs1(fwd_rs1),
+    .fwd_rs2(fwd_rs2)
+    );
+
+  csr csr(
+    .clk(clk),
+    .reset_n(reset_n),
+
+    .addr(csr_addr),
+    .write(csr_write),
+    .data_in(csr_data_in),
+    .error(csr_error),
+    .data_out(csr_data_out),
+
+    .wb_valid(wb_valid),
+    .wb_exc(wb_exc),
+    .wb_exc_cause(wb_exc_cause),
+    .wb_pc(wb_pc),
+    .wb_data(wb_data),
+    .csr_setpc(csr_setpc),
+    .csr_newpc(csr_newpc)
     );
 
 endmodule

@@ -1,14 +1,17 @@
 `timescale 1ns/1ps
 
+`include "defines.svh"
+
 module memory(
   input logic         clk,
   input logic         reset_n,
 
   // inputs/outputs to fetch stage
   input logic         fe_req,
-  input logic [31:0]  fe_addr,
+  input logic [31:2]  fe_addr,
 
   output logic        fe_ack,
+  output logic        fe_error,
   output logic [31:0] fe_data,
 
   // inputs/outputs to mem stage
@@ -20,26 +23,30 @@ module memory(
   input logic [1:0]   mem_width,
 
   output logic        mem_ack,
+  output logic        mem_error,
   output logic [31:0] mem_data_out
   );
-
-`include "defines.vh"
 
   assign fe_ack = fe_req & ~mem_req;
   assign mem_ack = mem_req;
 
+  // these signals will generate an access fault exception
+  // requesters are responsible for checking misalignment
+  assign fe_error = |fe_addr[30:16];
+  assign mem_error = |mem_addr[30:16];
+
   logic [3:0] byte_en;
   always_comb
-    casez({mem_width,mem_addr[1:0]})
-      4'b0000: byte_en = 4'b0001;
-      4'b0001: byte_en = 4'b0010;
-      4'b0010: byte_en = 4'b0100;
-      4'b0011: byte_en = 4'b1000;
+    unique0 casez({mem_width,mem_addr[1:0]})
+      'b0000: byte_en = 'b0001;
+      'b0001: byte_en = 'b0010;
+      'b0010: byte_en = 'b0100;
+      'b0011: byte_en = 'b1000;
 
-      4'b010?: byte_en = 4'b0011;
-      4'b011?: byte_en = 4'b1100;
+      'b010?: byte_en = 'b0011;
+      'b011?: byte_en = 'b1100;
 
-      4'b1???: byte_en = 4'b1111;
+      'b1???: byte_en = 'b1111;
     endcase
 
   logic [13:0] read_addr;
@@ -80,16 +87,16 @@ module memory(
 
   logic [31:0] read_data_ext;
   always_comb
-    casez(mem_width_r)
-      2'b00: begin
+    unique0 casez(mem_width_r)
+      'b00: begin
         read_data_ext[7:0] = read_data[mem_offset_r*8+:8];
-        read_data_ext[31:8] = mem_extend_r ? {24{read_data_ext[7]}} : 24'b0;
+        read_data_ext[31:8] = mem_extend_r ? {24{read_data_ext[7]}} : 0;
       end
-      2'b01: begin
+      'b01: begin
         read_data_ext[15:0] = mem_offset_r[1] ? read_data[31:16] : read_data[15:0];
-        read_data_ext[31:16] = mem_extend_r ? {16{read_data_ext[15]}} : 16'b0;
+        read_data_ext[31:16] = mem_extend_r ? {16{read_data_ext[15]}} : 0;
       end
-      2'b1?:
+      'b1?:
         read_data_ext = read_data;
     endcase
 
@@ -97,8 +104,8 @@ module memory(
   logic [31:0] fe_data_r;
   always_ff @(posedge clk)
     if(~reset_n) begin
-      mem_data_out_r <= 32'b0;
-      fe_data_r <= 32'b0;
+      mem_data_out_r <= 0;
+      fe_data_r <= 0;
     end else begin
       if(mem_req_r)
         mem_data_out_r <= read_data_ext;

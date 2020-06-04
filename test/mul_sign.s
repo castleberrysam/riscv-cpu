@@ -27,4 +27,4 @@
 	mulhu	t2, t0, t1
 	mulhsu	t2, t0, t1
 
-	.word	0
+	.word	TEST_MAGIC

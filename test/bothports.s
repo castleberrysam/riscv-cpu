@@ -3,4 +3,4 @@
 	lw	t0, (t0)
 	jal	t0, label
 
-label:	.word	0
+label:	.word	TEST_MAGIC

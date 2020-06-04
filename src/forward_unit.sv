@@ -1,57 +1,57 @@
 `timescale 1ns/1ps
 
+`include "defines.svh"
+
 module forward_unit(
   // inputs from decode
-  input logic [4:0]  de_rs1,
-  input logic [4:0]  de_rs2,
+  input logic [4:0] de_rs1,
+  input logic [4:0] de_rs2,
 
   // inputs from execute
-  input logic        ex_valid,
-  input logic        mem_read,
-  input logic [4:0]  ex_rd,
+  input logic       ex_valid,
+  input logic       mem_read,
+  input logic [4:0] ex_rd,
 
   // inputs from mem
-  input logic        mem_valid,
-  input logic        mem_read_r,
-  input logic [4:0]  mem_rd,
+  input logic       mem_valid,
+  input logic       mem_read_r,
+  input logic [4:0] mem_rd,
 
   // outputs to decode
-  output logic       load_stall,
-  output logic [1:0] forward_rs1,
-  output logic [1:0] forward_rs2
+  output logic      fwd_stall,
+  output fwd_type_t fwd_rs1,
+  output fwd_type_t fwd_rs2
   );
 
-`include "defines.vh"
-
   // FIXME maybe a macro here would help reduce this duplication.
-  logic load_stall_rs1;
+  logic fwd_stall_rs1;
   always_comb begin
-    load_stall_rs1 = 0;
-    forward_rs1 = NOT_FORWARDING;
+    fwd_stall_rs1 = 0;
+    fwd_rs1 = '{default:0};
 
     if(ex_valid & |ex_rd & (ex_rd == de_rs1)) begin
-      load_stall_rs1 = mem_read;
-      forward_rs1 = FORWARDING_EX;
+      fwd_stall_rs1 = mem_read;
+      fwd_rs1.ex = 1;
     end else if(mem_valid & |mem_rd & (mem_rd == de_rs1)) begin
-      load_stall_rs1 = mem_read_r;
-      forward_rs1 = FORWARDING_MEM;
+      fwd_stall_rs1 = mem_read_r;
+      fwd_rs1.mem = 1;
     end
   end
 
-  logic load_stall_rs2;
+  logic fwd_stall_rs2;
   always_comb begin
-    load_stall_rs2 = 0;
-    forward_rs2 = NOT_FORWARDING;
+    fwd_stall_rs2 = 0;
+    fwd_rs2 = '{default:0};
 
     if(ex_valid & |ex_rd & (ex_rd == de_rs2)) begin
-      load_stall_rs2 = mem_read;
-      forward_rs2 = FORWARDING_EX;
+      fwd_stall_rs2 = mem_read;
+      fwd_rs2.ex = 1;
     end else if(mem_valid & |mem_rd & (mem_rd == de_rs2)) begin
-      load_stall_rs2 = mem_read_r;
-      forward_rs2 = FORWARDING_MEM;
+      fwd_stall_rs2 = mem_read_r;
+      fwd_rs2.mem = 1;
     end
   end
 
-  assign load_stall = load_stall_rs1 | load_stall_rs2;
+  assign fwd_stall = fwd_stall_rs1 | fwd_stall_rs2;
 
 endmodule

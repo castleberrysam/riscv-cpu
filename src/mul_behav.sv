@@ -18,11 +18,11 @@ module mul_behav(
 
   logic [63:0] mul_result;
   always_comb
-    casez({sign0,sign1})
+    unique0 casez({sign0,sign1})
       2'b00: mul_result = m * r;
       2'b01: mul_result = $signed(m) * $signed({1'b0,r});
       2'b1?: mul_result = $signed(m) * $signed(r);
-    endcase
+     endcase
 
   generate
     if(LATENCY < 1) begin
@@ -39,10 +39,9 @@ module mul_behav(
 
       logic [63:0] pipe[LATENCY-1:0];
 
-      integer i;
       always_ff @(posedge clk) begin
         pipe[0] <= mul_result;
-        for(i=1;i<LATENCY;i=i+1)
+        for(int i=1;i<LATENCY;i++)
           pipe[i] <= pipe[i-1];
       end
 

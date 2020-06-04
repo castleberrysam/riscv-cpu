@@ -1,0 +1,98 @@
+Exceptions
+
+* What needs to happen on an exception?
+** Set mepc to PC
+** Set mcause
+** Set mtval
+** Set mstatus
+** Set PC to BASE or BASE+(4*cause) from mtvec
+
+Interrupts
+|-------+-------------------------------|
+|  Code | Description                   |
+|-------+-------------------------------|
+|     0 | User software interrupt       |
+|     1 | Supervisor software interrupt |
+|     2 | Reserved                      |
+|     3 | Machine software interrupt    |
+|-------+-------------------------------|
+|     4 | User timer interrupt          |
+|     5 | Supervisor timer interrupt    |
+|     6 | Reserved                      |
+|     7 | Machine timer interrupt       |
+|-------+-------------------------------|
+|     8 | User external interrupt       |
+|     9 | Supervisor external interrupt |
+|    10 | Reserved                      |
+|    11 | Machine external interrupt    |
+|-------+-------------------------------|
+| 12-15 | Reserved                      |
+|-------+-------------------------------|
+|  >=16 | Platform dependent            |
+|-------+-------------------------------|
+
+Exceptions
+|-------+--------------------------------+---------|
+|  Code | Description                    | Source  |
+|-------+--------------------------------+---------|
+|     0 | Instruction address misaligned | Execute |
+|     1 | Instruction access fault       | Fetch   |
+|-------+--------------------------------+---------|
+|     2 | Illegal instruction            | Decode  |
+|     3 | Breakpoint                     | Decode  |
+|-------+--------------------------------+---------|
+|     4 | Load address misaligned        | Memory  |
+|     5 | Load access fault              | Memory  |
+|-------+--------------------------------+---------|
+|     6 | Store/AMO address misaligned   | Memory  |
+|     7 | Store/AMO access fault         | Memory  |
+|-------+--------------------------------+---------|
+|     8 | Environment call from U-mode   | Decode  |
+|     9 | Environment call from S-mode   | Decode  |
+|    10 | Reserved                       |         |
+|    11 | Environment call from M-mode   | Decode  |
+|-------+--------------------------------+---------|
+|    12 | Instruction page fault         | Fetch   |
+|    13 | Load page fault                | Memory  |
+|    14 | Reserved                       |         |
+|    15 | Store/AMO page fault           | Memory  |
+|-------+--------------------------------+---------|
+| 16-23 | Reserved                       |         |
+| 24-31 | Custom                         |         |
+| 32-47 | Reserved                       |         |
+| 48-63 | Custom                         |         |
+|  >=64 | Reserved                       |         |
+|-------+--------------------------------+---------|
+
+mstatus
+|-------+------+-----------------------------|
+|  Bits | Name | Description                 |
+|-------+------+-----------------------------|
+|     0 | UIE  | Int enable, user            |
+|     1 | SIE  | Int enable, supervisor      |
+|     2 |      |                             |
+|     3 | MIE  | Int enable, machine         |
+|-------+------+-----------------------------|
+|     4 | UPIE | Prev int enable, user       |
+|     5 | SPIE | Prev int enable, supervisor |
+|     6 |      |                             |
+|     7 | MPIE | Prev int enable, machine    |
+|-------+------+-----------------------------|
+|     8 | SPP  | Prev priv, supervisor       |
+|  10:9 |      |                             |
+| 12:11 | MPP  | Prev priv, machine          |
+|-------+------+-----------------------------|
+| 14:13 | FS   | FPU status                  |
+| 16:15 | XS   | Extension status            |
+|-------+------+-----------------------------|
+|    17 | MPRV | Modify priv                 |
+|    18 | SUM  | Supervisor user mem access  |
+|    19 | MXR  | Make exec readable          |
+|    20 | TVM  | Trap virtual mem            |
+|    21 | TW   | Timeout WFI                 |
+|    22 | TSR  | Trap SRET                   |
+|-------+------+-----------------------------|
+| 30:23 |      |                             |
+|-------+------+-----------------------------|
+|    31 | SD   | State dirty (FS/XS)         |
+|-------+------+-----------------------------|

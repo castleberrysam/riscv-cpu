@@ -29,12 +29,12 @@ module mul_booth(
   logic [32:0] sum;
   always_comb begin
     sum = {1'b0,acc[64:33]};
-    case({sign0,acc[1:0]})
-      3'b010: sum = sum + m;
-      3'b011: sum = sum + m;
+    unique0 case({sign0,acc[1:0]})
+      'b010: sum = sum + m;
+      'b011: sum = sum + m;
 
-      3'b101: sum = sum + m;
-      3'b110: sum = sum - m;
+      'b101: sum = sum + m;
+      'b110: sum = sum - m;
     endcase
   end
 

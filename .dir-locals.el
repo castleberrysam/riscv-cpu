@@ -13,4 +13,6 @@
                   (verilog-case-indent . 2)
                   (verilog-indent-lists . nil)
                   (verilog-cexp-indent . 2)
-                  (verilog-auto-endcomments . nil))))
+                  (verilog-auto-endcomments . nil)
+                  (verilog-case-fold . nil)
+                  (verilog-typedef-regexp . "_t$"))))

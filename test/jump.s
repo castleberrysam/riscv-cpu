@@ -6,6 +6,6 @@
 label:	jalr	x0, ra, 0
 
 end:	addi	a0, x0, -1
-	.word	0
+	.word	TEST_MAGIC
 
 	# 0, 3, 1, 2, 4

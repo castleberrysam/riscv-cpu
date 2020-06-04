@@ -11,4 +11,4 @@
 	add     t5, t5, t5
 	addi    x0, x0, -12
 	add     s0, x0, x0
-	.word	0
+	.word	TEST_MAGIC

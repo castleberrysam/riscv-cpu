@@ -1,5 +1,7 @@
 `timescale 1ns/1ps
 
+`include "defines.svh"
+
 module sram(
   input logic                clk,
   input logic                reset_n,
@@ -19,8 +21,6 @@ module sram(
   parameter DEPTH = 1024;
   localparam LOGDEPTH = $clog2(DEPTH);
 
-`include "defines.vh"
-
   logic [31:0] storage[0:DEPTH-1];
 
   // init data
@@ -30,19 +30,18 @@ module sram(
     $readmemb("sram.mif", storage);
 `endif
 `else
-  integer j;
   logic [8*32:1] memfile;
   logic [31:0] fd;
   logic [640:1] error;
   initial begin
-    for(j=0;j<DEPTH;j=j+1)
-      storage[j] = 32'b0;
+    for(int j=0;j<DEPTH;j++)
+      storage[j] = 0;
 
     if(!$value$plusargs("memfile=%s", memfile))
       memfile = "memory.hex";
 
     fd = $fopen(memfile, "r");
-    if(fd == 32'b0) begin
+    if(fd == 0) begin
       $fdisplay(STDERR, "Cannot open memfile %0s: error %0d (%0s)", memfile, $ferror(fd, error), error);
       $finish;
     end
@@ -58,10 +57,9 @@ module sram(
       read_data <= storage[read_addr];
 
   // write port
-  integer i;
   always @(posedge clk)
     if(write_req)
-      for(i=0;i<4;i=i+1)
+      for(int i=0;i<4;i++)
         if(write_byte_en[i])
           storage[write_addr][i*8+:8] <= write_data[i*8+:8];
 

@@ -2,14 +2,16 @@ SRCS := $(wildcard *.s)
 OUTS_ELF := $(SRCS:.s=.elf)
 OUTS_HEX := $(SRCS:.s=.hex)
 
+TEST_MAGIC := 0xdecafbad
+
 .PHONY: all clean
 
 all: $(OUTS_ELF) $(OUTS_HEX)
 
 %.o: %.s
-	riscv64-linux-gnu-as -march=rv32im -o $@ $<
+	riscv64-linux-gnu-as -march=rv32im --defsym TEST_MAGIC=$(TEST_MAGIC) -o $@ $<
 
-%.elf: %.o
+%.elf: %.o link.ld
 	riscv64-linux-gnu-ld -melf32lriscv -Tlink.ld -o $@ $<
 
 %.bin: %.elf

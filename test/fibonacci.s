@@ -1,19 +1,19 @@
 	.text
 	li	a0, 100
 	jal	ra, fibonacci
-	.word	0
+	.word	TEST_MAGIC
 
 fibonacci:
-	addi	t0, a0, 0
+	mv	t0, a0
 	li	a0, 1
 	li	a1, 1
 
 loop:	addi	t0, t0, -1
-	ble	t0, zero, return
+	blez	t0, return
 
 	add	t1, a0, a1
-	addi	a1, a0, 0
-	addi	a0, t1, 0
-	beq	zero, zero, loop
+	mv	a1, a0
+	mv	a0, t1
+	j	loop
 
-return:	jalr	x0, ra
+return:	ret

@@ -9,4 +9,4 @@
 	add     t4, t1, a0
 	lb	s1, 1(s0)
 	sub     t1, t3, s0
-	.word	0
+	.word	TEST_MAGIC

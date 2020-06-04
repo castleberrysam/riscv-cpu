@@ -7,4 +7,4 @@
 	lh	t1, 2(s0)
 	lh	a0, 0(s0)
 	lb	s1, 1(s0)
-	.word	0
+	.word	TEST_MAGIC

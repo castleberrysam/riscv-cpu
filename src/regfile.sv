@@ -1,5 +1,7 @@
 `timescale 1ns/1ps
 
+`include "defines.svh"
+
 module regfile(
   input logic         clk,
   input logic         reset_n,
@@ -15,8 +17,6 @@ module regfile(
   input logic         wen
   );
 
-`include "defines.vh"
-
   logic [31:0] regs[31:1];
 
   // read port 1 (with passthrough)
@@ -24,7 +24,7 @@ module regfile(
   assign wr_rs1 = wen & (wreg == rs1);
   always_comb
     if(~|rs1)
-      rdata1 = 32'b0;
+      rdata1 = 0;
     else if(wr_rs1)
       rdata1 = wdata;
     else
@@ -35,7 +35,7 @@ module regfile(
   assign wr_rs2 = wen & (wreg == rs2);
   always_comb
     if(~|rs2)
-      rdata2 = 32'b0;
+      rdata2 = 0;
     else if(wr_rs2)
       rdata2 = wdata;
     else
@@ -44,14 +44,13 @@ module regfile(
 `ifndef SYNTHESIS
   always_ff @(posedge clk)
     if(wen && |wreg)
-      $display("%d: regfile: write %0s (x%0d) = %08x", $stime, abi_name(wreg), wreg, wdata);
+      $display("%d: regfile: write %0s (x%0d) = %08x", $stime, abi_names[wreg], wreg, wdata);
 `endif
 
-  integer i;
   always_ff @(posedge clk)
     if(~reset_n)
-      for(i=1;i<32;i=i+1)
-        regs[i] <= 32'b0;
+      for(int i=1;i<32;i++)
+        regs[i] <= 0;
     else if(wen && |wreg)
       regs[wreg] <= wdata;
 

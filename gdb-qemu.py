@@ -3,6 +3,8 @@
 
 import gdb
 
+TEST_MAGIC = "decafbad"
+
 class RunTest(gdb.Command):
   def __init__(self):
     super(RunTest, self).__init__("run_test", gdb.COMMAND_USER)
@@ -14,10 +16,11 @@ class RunTest(gdb.Command):
     for i in range(32):
       gdb.execute("set $x" + str(i) + " = 0")
     while True:
-      insn = gdb.execute("x/i $pc", to_string=True)
-      if "unimp" in insn:
+      insn = gdb.execute("x/xw $pc", to_string=True)
+      if TEST_MAGIC in insn:
         break
-      print(insn)
+      gdb.execute("x/i $pc")
+      print()
       gdb.execute("si")
       gdb.execute("info registers")
 

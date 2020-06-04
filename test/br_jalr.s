@@ -13,4 +13,4 @@ never_reach:
 	j	end
 
 end:	addi	a0, a0, 1
-	.word	0
+	.word	TEST_MAGIC
