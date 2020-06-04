@@ -51,7 +51,7 @@ typedef enum logic [3:0] {
   MCALL    = 11,
   IPFAULT  = 12,
   LPFAULT  = 13,
-  // reserved in the spec, we are using it internally to signal an ecall
+  // reserved in the spec, we are using it to signal internally
   ERET     = 14,
   SPFAULT  = 15
 } ecause_t;
