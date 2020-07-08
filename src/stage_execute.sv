@@ -3,83 +3,114 @@
 `include "defines.svh"
 
 module stage_execute(
-  input logic         clk,
+  input logic         clk_core,
   input logic         reset_n,
 
-  // inputs from decode stage
-  input logic         ex_valid,
-  input logic         ex_exc,
-  input ecause_t      ex_exc_cause,
+  // decode inputs/outputs
+  input logic         de_valid,
+  input logic         de_exc,
+  input ecause_t      de_exc_cause,
+  input logic [31:2]  de_pc,
 
-  input logic [31:2]  ex_pc,
-  input logic [31:0]  ex_rdata1,
-  input logic [31:0]  ex_rdata2,
-  input logic [31:0]  ex_imm,
+  input logic [31:0]  de_rdata1,
+  input logic [31:0]  de_rdata2,
+  input logic [31:0]  de_imm,
 
-  input logic         ex_use_pc,
-  input logic         ex_use_imm,
-  input logic         ex_sub_sra,
-  input logic         ex_data1_sel,
-  input aluop_t       ex_op,
+  input logic         de_use_pc,
+  input logic         de_use_imm,
+  input logic         de_sub_sra,
+  input logic         de_data1_sel,
+  input aluop_t       de_op,
 
-  input logic         ex_br,
-  input logic         ex_br_inv,
-  input logic         ex_br_taken,
+  input logic         de_br,
+  input logic         de_br_inv,
+  input logic         de_br_taken,
 
-  input logic         ex_br_misalign,
-  input logic         ex_br_miss_misalign,
+  input logic         de_br_misalign,
+  input logic         de_br_miss_misalign,
 
-  input logic         mem_read,
-  input logic         mem_write,
-  input logic         mem_extend,
-  input logic [1:0]   mem_width,
+  input logic         de_mem_read,
+  input logic         de_mem_write,
+  input logic         de_mem_extend,
+  input logic [1:0]   de_mem_width,
 
-  input logic [4:0]   wb_reg,
+  input logic [4:0]   de_wb_reg,
 
-  // inputs from mem stage
-  input logic         mem_stall,
-
-  // inputs from write stage
-  input logic         wb_exc,
-
-  // outputs to decode stage
   output logic        ex_stall,
   output logic        ex_br_miss,
 
-  // outputs to forwarding unit
-  output logic [31:0] ex_forward_data,
+  // memory0 inputs/outputs
+  output logic        ex_valid,
+  input logic         mem0_stall,
+  output logic        ex_exc,
+  output ecause_t     ex_exc_cause,
+  output logic [31:2] ex_pc,
 
-  // outputs to mem stage
-  output logic        mem_valid,
-  output logic        mem_exc,
-  output ecause_t     mem_exc_cause,
+  output logic [31:0] ex_data0,
+  output logic [31:0] ex_data1,
 
-  output logic [31:2] mem_pc,
+  output logic        ex_mem_read,
+  output logic        ex_mem_write,
+  output logic        ex_mem_extend,
+  output logic [1:0]  ex_mem_width,
 
-  output logic [31:0] mem_data0,
-  output logic [31:0] mem_data1,
+  output logic [4:0]  ex_wb_reg,
 
-  output logic        mem_read_r,
-  output logic        mem_write_r,
-  output logic        mem_extend_r,
-  output logic [1:0]  mem_width_r,
+  // csr inputs
+  input logic         csr_kill_setpc,
 
-  output logic [4:0]  wb_reg_r
+  // writeback inputs
+  input logic         wb_exc,
+
+  // forward unit outputs
+  output logic [31:0] ex_fwd_data
   );
 
-  logic br_check;
-  assign br_check = ex_valid & ~mem_stall & ex_br;
-  assign ex_br_miss = br_check & (ex_br_inv ^ ex_br_taken ^ cmp_out);
+  logic        de_exc_r;
+  ecause_t     de_exc_cause_r;
 
-  always_ff @(posedge clk)
-    if(!mem_stall) begin
-      mem_pc <= ex_pc;
-      mem_read_r <= mem_read;
-      mem_write_r <= mem_write;
-      mem_extend_r <= mem_extend;
-      mem_width_r <= mem_width;
-      wb_reg_r <= wb_reg;
+  logic [31:0] ex_rdata1, ex_rdata2, ex_imm;
+  logic        ex_use_pc, ex_use_imm, ex_sub_sra, ex_data1_sel;
+  aluop_t      ex_op;
+  logic        ex_br, ex_br_inv, ex_br_taken;
+  logic        ex_br_misalign, ex_br_miss_misalign;
+  always_ff @(posedge clk_core)
+    if(~reset_n)
+      ex_valid <= 0;
+    else if(~ex_stall) begin
+      ex_valid <= de_valid;
+      de_exc_r <= de_exc;
+      de_exc_cause_r <= de_exc_cause;
+      ex_pc <= de_pc;
+
+      ex_rdata1 <= de_rdata1;
+      ex_rdata2 <= de_rdata2;
+      ex_imm <= de_imm;
+
+      ex_use_pc <= de_use_pc;
+      ex_use_imm <= de_use_imm;
+      ex_sub_sra <= de_sub_sra;
+      ex_data1_sel <= de_data1_sel;
+      ex_op <= de_op;
+
+      ex_br <= de_br;
+      ex_br_inv <= de_br_inv;
+      ex_br_taken <= de_br_taken;
+
+      ex_br_misalign <= de_br_misalign;
+      ex_br_miss_misalign <= de_br_miss_misalign;
+
+      ex_mem_read <= de_mem_read;
+      ex_mem_write <= de_mem_write;
+      ex_mem_extend <= de_mem_extend;
+      ex_mem_width <= de_mem_width;
+
+      ex_wb_reg  <= de_wb_reg;
     end
+
+  logic br_check;
+  assign br_check = ex_valid & ex_br;
+  assign ex_br_miss = br_check & (ex_br_inv ^ ex_br_taken ^ cmp_out);
 
   logic [31:0] op1, op2;
   assign op1 = ex_use_pc ? {ex_pc,2'b0} : ex_rdata1;
@@ -92,7 +123,7 @@ module stage_execute(
   logic        mul_done;
   logic [63:0] mul_result;
   mul_behav #(4) mul(
-    .clk(clk),
+    .clk(clk_core),
     .reset_n(reset_n),
 
     .go(mul_go),
@@ -107,15 +138,16 @@ module stage_execute(
 
   logic cmp_out;
   always_comb
-    unique0 case(1)
+    unique case(1)
       ex_op.seq: cmp_out = ex_rdata1 == op2;
       ex_op.slt: cmp_out = $signed(ex_rdata1) < $signed(op2);
       ex_op.sltu: cmp_out = ex_rdata1 < op2;
+      default: cmp_out = '0;
     endcase
 
   logic [31:0] alu_out;
   always_comb
-    unique0 case(1)
+    unique case(1)
       ex_op.nop: alu_out = op2;
 
       ex_op.add: alu_out = op1 + (ex_sub_sra ? -op2 : op2);
@@ -130,45 +162,34 @@ module stage_execute(
 
       ex_op.mul: alu_out = mul_result[31:0];
       ex_op.mulh, ex_op.mulhsu, ex_op.mulhu: alu_out = mul_result[63:32];
+
+      default: alu_out = '0;
     endcase
 
-  assign ex_forward_data = alu_out;
+  assign ex_fwd_data = alu_out;
 
-  logic exc;
-  always_ff @(posedge clk)
-    if(!mem_stall) begin
-      mem_data0 <= exc ? ex_imm : alu_out;
-      mem_data1 <= ex_data1_sel ? ex_rdata1 : ex_rdata2;
-    end
-
-  ecause_t ecause;
   always_comb begin
-    exc = 1;
-    unique if(ex_exc)
-      ecause = ex_exc_cause;
-    else if(ex_valid & ex_br & ex_br_miss & ex_br_misalign)
-      ecause = IALIGN;
-    else if(ex_valid & ex_br & ~ex_br_miss & ex_br_miss_misalign)
-      ecause = IALIGN;
-    else
-      exc = 0;
+    ex_data0 = ex_exc ? ex_imm : alu_out;
+    ex_data1 = ex_data1_sel ? ex_rdata1 : ex_rdata2;
   end
 
-  always_ff @(posedge clk)
-    if(!mem_stall) begin
-      mem_exc <= exc & ~wb_exc;
-      mem_exc_cause <= ecause;
-    end
-
-  assign ex_stall = ex_valid & (mem_stall | (mul_go & ~mul_done));
-  always_ff @(posedge clk)
-    if(~reset_n)
-      mem_valid <= 0;
+  always_comb begin
+    ex_exc = 1;
+    ex_exc_cause = de_exc_cause_r;
+    unique if(de_exc_r)
+      ex_exc_cause = de_exc_cause_r;
+    else if(ex_valid & ex_br & ex_br_miss & ex_br_misalign)
+      ex_exc_cause = IALIGN;
+    else if(ex_valid & ex_br & ~ex_br_miss & ex_br_miss_misalign)
+      ex_exc_cause = IALIGN;
     else
-      mem_valid <= mem_stall | (ex_valid & ~ex_stall & ~exc & ~wb_exc);
+      ex_exc = 0;
+  end
+
+  assign ex_stall = ex_valid & (mem0_stall | (mul_go & ~mul_done));
 
 `ifndef SYNTHESIS
-  always_ff @(posedge clk)
+  always_ff @(posedge clk_core)
     if(ex_stall)
       $display("%d: stage_execute: stalling", $stime);
 `endif

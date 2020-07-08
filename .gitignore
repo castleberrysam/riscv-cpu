@@ -12,6 +12,7 @@ sim/.Xil
 sim/xsim.dir
 sim/axsim.sh
 
+fpga/ip
 fpga/*.jou
 fpga/*.log
 fpga/.Xil

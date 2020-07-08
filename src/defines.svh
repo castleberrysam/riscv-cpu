@@ -36,7 +36,7 @@ localparam
   STDERR = 32'h80000002;
 
 // Exceptions
-typedef enum logic [3:0] {
+typedef enum logic [4:0] {
   IALIGN   = 0,
   IFAULT   = 1,
   IILLEGAL = 2,
@@ -51,15 +51,30 @@ typedef enum logic [3:0] {
   MCALL    = 11,
   IPFAULT  = 12,
   LPFAULT  = 13,
-  // reserved in the spec, we are using it to signal internally
-  ERET     = 14,
-  SPFAULT  = 15
+
+  SPFAULT  = 15,
+
+  // custom use values
+  ERET     = 24,
+  FLUSH    = 25
 } ecause_t;
 
 // Forwarding
 typedef struct packed {
-  logic ex, mem;
+  logic ex, mem0, mem1;
 } fwd_type_t;
+
+// Virtual memory
+typedef struct packed {
+  logic d, a, g, u, x, w, r, v;
+} pte_flags_t;
+
+typedef struct packed {
+  logic [4:0]  _unused;
+  logic [16:0] ppn;
+  logic [1:0]  rsw;
+  pte_flags_t  flags;
+} pte_t;
 
 // Utility
 string abi_names[32] = '{

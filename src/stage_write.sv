@@ -3,44 +3,66 @@
 `include "defines.svh"
 
 module stage_write(
-  input logic         clk,
+  input logic         clk_core,
   input logic         reset_n,
 
-  // inputs from mem stage
-  input logic         wb_valid,
-  input logic         wb_exc,
+  // fetch1 inputs
+  input logic         fe1_stall,
 
-  input logic [31:2]  wb_pc,
+  // memory1 inputs/outputs
+  input logic         mem1_valid_wb,
+  output logic        wb_stall,
+  input logic         mem1_exc,
+  input ecause_t      mem1_exc_cause,
+  input logic         mem1_flush,
+  input logic [31:2]  mem1_pc,
 
-  input logic [4:0]   wb_reg,
-  input logic [31:0]  wb_data,
+  input logic         mem1_stall,
 
-  // outputs to decode stage
-  output logic [4:0]  wreg,
-  output logic [31:0] wdata,
-  output logic        wen,
+  input logic [4:0]   mem1_wb_reg,
+  input logic [31:0]  mem1_dout,
 
-  // outputs to mem stage
-  output logic        wb_stall
+  // decode outputs
+  output logic        wb_valid,
+  output logic [4:0]  wb_reg,
+  output logic [31:0] wb_data,
+  
+  // csr outputs
+  output logic        wb_exc,
+  output ecause_t     wb_exc_cause,
+  output logic        wb_flush,
+  output logic [31:2] wb_pc
   );
 
-  assign wreg = wb_reg;
-  assign wdata = wb_data;
-  assign wen = wb_valid & ~wb_exc;
+  // we cannot interrupt an ongoing cache evict/fill (due to bus transactions)
+  assign wb_stall = wb_exc & (fe1_stall | mem1_stall);
 
-  assign wb_stall = 0;
+  always_ff @(posedge clk_core)
+    if(~reset_n) begin
+      wb_valid <= 0;
+      wb_exc <= 0;
+    end else if(~wb_stall) begin
+      wb_valid <= mem1_valid_wb;
+      wb_exc <= mem1_exc;
+      wb_exc_cause <= mem1_exc_cause;
+      wb_flush <= mem1_flush;
+      wb_pc <= mem1_pc;
+
+      wb_reg <= mem1_wb_reg;
+      wb_data <= mem1_dout;
+    end
 
 `ifndef SYNTHESIS
   logic [31:0] retire_pc;
-  always_ff @(posedge clk)
-    if(wb_valid) begin
+  always_ff @(posedge clk_core)
+    if(wb_valid & ~wb_stall) begin
       retire_pc <= {wb_pc,2'b0};
       $strobe("%d: stage_write: retire insn at pc %08x", $stime, retire_pc);
     end
 
-  always_ff @(posedge clk)
+  always_ff @(posedge clk_core)
     if(wb_stall)
-      $display("%d: stage_wb: stalling", $stime);
+      $display("%d: stage_write: stalling", $stime);
 `endif
 
 endmodule

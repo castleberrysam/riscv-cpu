@@ -1,25 +1,22 @@
 SRCS := top_fpga.sv $(wildcard ../src/*.sv)
 
-.PHONY: all elab timing yosys prog flash clean
+.PHONY: all ip dram_mig elab timing prog flash clean
 
 all: top.bit
 
-top.bit: $(SRCS) sram.mif constraints.xdc synth_full.tcl
+top.bit: $(SRCS) ip rom.mif constraints.xdc synth_full.tcl
 	vivado -nojou -mode batch -source synth_full.tcl
 
-elab: $(SRCS) elab.tcl
+elab: $(SRCS) ip elab.tcl
 	vivado -nojou -mode tcl -source elab.tcl
 
-timing: $(SRCS) sram.mif constraints.xdc synth_timing.tcl
+timing: $(SRCS) ip rom.mif constraints.xdc synth_timing.tcl
 	vivado -nojou -mode batch -source synth_timing.tcl
 
-yosys: top_yosys.bit
+ip: ip/dram_mig
 
-top_yosys.bit: top_fpga.edif sram.mif constraints.xdc synth_full_yosys.tcl
-	vivado -nojou -mode batch -source synth_full_yosys.tcl
-
-top_fpga.edif: $(SRCS)
-	yosys -DSLOW_MUL -p 'synth_xilinx -top top_fpga; write_edif -top top_fpga top_fpga.edif' $(SRCS)
+ip/dram_mig: gen_dram_mig.tcl
+	vivado -nojou -mode batch -source gen_dram_mig.tcl
 
 %.mif: %.bin bin2mif.py
 	./bin2mif.py $< 16384 > $@
