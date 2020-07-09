@@ -210,8 +210,11 @@ module stage_fetch1(
   assign bus_stall_rdata = fe1_rready & ~bmain_rvalid_fe1;
   assign bus_stall = bus_stall_cmd | bus_stall_rdata;
 
+  logic bus_beat_rdata;
+  assign bus_beat_rdata = fe1_rready & bmain_rvalid_fe1;
+
   struct packed {
-    logic idle, evict, fill0, fill1;
+    logic idle, fill0, fill1;
   } cam_state, cam_state_next;
 
   always_ff @(posedge clk_core)
@@ -225,38 +228,31 @@ module stage_fetch1(
   logic cam_stall;
   assign cam_stall = bus_stall | ~cam_state_next.idle;
 
-  logic         cam_tlb_hit;
-  logic [28:12] cam_tlb_ppn;
-  logic [7:0]   cam_tlb_flags;
-  always_comb begin
-    cam_tlb_hit = ic_tlb_read_hit | fe1_tlb_write_req;
-    if(fe1_tlb_write_req) begin
-      cam_tlb_ppn = fe1_tlb_write_ppn;
-      cam_tlb_flags = fe1_tlb_write_flags;
-    end else begin
-      cam_tlb_ppn = ic_tlb_read_ppn;
-      cam_tlb_flags = ic_tlb_read_flags;
-    end
-  end
+  assign fe1_cam_read_tag_in = satp_mode ? ic_tlb_read_ppn : fe1_pc[28:12];
 
-  assign fe1_cam_read_tag_in = satp_mode ? cam_tlb_ppn : fe1_pc[28:12];
-
-  logic [3:2] cam_line_offset, cam_line_offset_next;
-  always_comb
-    unique case(1)
-      cam_state_next.evict: cam_line_offset_next = fe1_pc[3:2] + 1;
-      cam_state_next.fill1: cam_line_offset_next = fe1_pc[3:2];
-      default: cam_line_offset_next = cam_line_offset + 1;
-    endcase
+  logic [3:2] cam_line_offset;
   always_ff @(posedge clk_core)
-    if(~bus_stall_rdata)
-      cam_line_offset <= cam_line_offset_next;
+    if(~reset_n)
+      cam_line_offset <= '0;
+    else if(bus_beat_rdata)
+      cam_line_offset <= cam_line_offset + 1;
 
   logic cam_insn_wen;
-  logic [31:0] cam_insn, cam_insn_next;
+  logic [31:0] cam_insn;
   always_ff @(posedge clk_core)
     if(cam_insn_wen)
-      cam_insn <= cam_insn_next;
+      cam_insn <= bmain_rdata;
+
+  assign fe1_cmd = 1;
+  assign fe1_addr = {fe1_cam_read_tag_in,fe1_pc[11:2]};
+
+  assign fe1_cam_write_index = {fe1_pc[11:4],cam_line_offset};
+  assign fe1_cam_write_tag = fe1_cam_read_tag_in;
+  assign fe1_cam_write_data = bmain_rdata;
+  assign fe1_cam_write_flags = 'b01;
+
+  logic fe1_insn_sel;
+  assign fe1_insn = fe1_insn_sel ? cam_insn : ic_cam_read_data;
 
   logic cam_exc;
   always_comb begin
@@ -264,127 +260,52 @@ module stage_fetch1(
     cam_state_next = cam_state;
     cam_exc = 0;
 
-    fe1_cam_write_index = 0;
-
     fe1_cam_write_req_data = 0;
-    fe1_cam_write_data = 0;
-
     fe1_cam_write_req_tag_flags = 0;
-    fe1_cam_write_tag = 0;
-    fe1_cam_write_flags = 0;
-
-    fe1_insn = 0;
-
-    cam_insn_wen = 0;
-    cam_insn_next = 0;
 
     fe1_cvalid = 0;
-    fe1_cmd = 0;
-    fe1_addr = '0;
-
     fe1_rready = 0;
 
-    // fe1_wvalid = 0;
-    // fe1_wlast = 0;
-    // fe1_wdata = '0;
-    // fe1_wmask = '0;
+    cam_insn_wen = 0;
+    fe1_insn_sel = 0;
 
     unique case(1)
-      cam_state.idle: begin
+      cam_state.idle:
         // tlb hit, cam miss?
-        if(fe1_valid & ~csr_kill & (~satp_mode | cam_tlb_hit) & ~ic_cam_read_hit)
-          // need to evict?
-          // if(ic_cam_read_flags[0] & ic_cam_read_flags[1]) begin
-          //   // initiate bus write
-          //   fe1_cvalid = 1;
-          //   fe1_cmd = 0;
-          //   fe1_addr = {ic_cam_read_tag_out,fe1_pc[11:2]};
-
-          //   fe1_wvalid = 1;
-          //   fe1_wlast = 0;
-          //   fe1_wdata = ic_cam_read_data;
-          //   fe1_wmask = '1;
-
-          //   // read word from cache
-          //   fe1_cam_read_req = ~bus_stall_wdata;
-          //   fe1_cam_read_index = {fe1_pc[11:4],cam_line_offset_next};
-
-          //   cam_state_next = '{evict:1,default:0};
-          // end else begin
-          begin
-            // initiate bus read
-            fe1_cvalid = 1;
-            fe1_cmd = 1;
-            fe1_addr = {fe1_cam_read_tag_in,fe1_pc[11:2]};
-
-            cam_state_next = '{fill1:1,default:0};
-          end
-          // end
-        else
-          fe1_insn = ic_cam_read_data;
-      end
-
-      /*
-      cam_state.evict: begin
-        // continue bus write
-        fe1_wvalid = 1;
-        fe1_wlast = cam_line_offset_next == fe1_pc[3:2];
-        fe1_wdata = ic_cam_read_data;
-        fe1_wmask = '1;
-
-        // not last word?
-        if(cam_line_offset_next != fe1_pc[3:2]) begin
-          // read word from cache
-          fe1_cam_read_req = bus_ack;
-          fe1_cam_read_index = {fe1_pc[11:4],cam_line_offset_next};
-        end else begin
-          // mark line invalid
-          fe1_cam_write_req_tag_flags = bus_ack;
-          fe1_cam_write_flags = 0;
-
+        if(fe1_valid & ~csr_kill & (~satp_mode | ic_tlb_read_hit) & ~ic_cam_read_hit) begin
+          // initiate bus read
+          fe1_cvalid = 1;
           cam_state_next = '{fill0:1,default:0};
         end
-      end
 
       cam_state.fill0: begin
-        // initiate bus read
-        fe1_cvalid = 1;
-        fe1_cmd = 1;
-        fe1_addr = {fe1_cam_read_tag_in,fe1_pc[11:2]};
+        // continue bus read
+        fe1_rready = 1;
 
-        cam_state_next = '{fill1:1,default:0};
-      end
-       */
-
-      cam_state.fill1: begin
         // write word to cache
-        fe1_cam_write_index = {fe1_pc[11:4],cam_line_offset};
         fe1_cam_write_req_data = 1;
-        fe1_cam_write_data = bmain_rdata;
 
-        // first word?
-        if(cam_line_offset_next ^ 'b10 == fe1_pc[3:2]) begin
+        // is this the desired word?
+        if(cam_line_offset == fe1_pc[3:2])
           // capture instruction
           cam_insn_wen = 1;
-          cam_insn_next = bmain_rdata;
-        end
 
-        // not last word?
-        if(cam_line_offset_next != fe1_pc[3:2])
-          // continue bus read
-          fe1_rready = 1;
-        else begin
+        // last word?
+        if(bmain_rlast) begin
           // mark line valid
           fe1_cam_write_req_tag_flags = 1;
-          fe1_cam_write_tag = fe1_cam_read_tag_in;
-          fe1_cam_write_flags = 'b01;
 
-          // issue instruction
-          fe1_insn = cam_insn;
-
-          cam_state_next = '{idle:1,default:0};
+          cam_state_next = '{fill1:1,default:0};
         end
        end
+
+      cam_state.fill1: begin
+        // issue instruction
+        fe1_insn_sel = 1;
+
+        cam_state_next = '{idle:1,default:0};
+      end
+
     endcase
   end
 

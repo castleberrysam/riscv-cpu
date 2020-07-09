@@ -309,6 +309,10 @@ module stage_memory1(
   assign bus_stall_rdata = mem1_rready & ~bmain_rvalid_mem1;
   assign bus_stall = bus_stall_cmd | bus_stall_wdata | bus_stall_rdata;
 
+  logic bus_beat_wdata, bus_beat_rdata;
+  assign bus_beat_wdata = mem1_wvalid & bmain_wready_mem1;
+  assign bus_beat_rdata = mem1_rready & bmain_rvalid_mem1;
+
   struct packed {
     logic idle, evict, fill0, fill1;
   } cam_state, cam_state_next;
@@ -324,33 +328,15 @@ module stage_memory1(
   logic cam_stall;
   assign cam_stall = bus_stall | ~cam_state_next.idle;
 
-  // tlb write passthrough
-  logic         cam_tlb_hit;
-  logic [28:12] cam_tlb_ppn;
-  logic [7:0]   cam_tlb_flags;
-  always_comb begin
-    cam_tlb_hit = dc_tlb_read_hit | mem1_tlb_write_req;
-    if(mem1_tlb_write_req) begin
-      cam_tlb_ppn = mem1_tlb_write_ppn;
-      cam_tlb_flags = mem1_tlb_write_flags;
-    end else begin
-      cam_tlb_ppn = dc_tlb_read_ppn;
-      cam_tlb_flags = dc_tlb_read_flags;
-    end
-  end
-
-  assign mem1_cam_read_tag_in = virt ? cam_tlb_ppn : mem1_addr[28:12];
-
-  logic [3:2] cam_line_offset, cam_line_offset_next;
-  always_comb
-    unique case(1)
-      cam_state_next.evict: cam_line_offset_next = mem1_addr[3:2] + 1;
-      cam_state_next.fill1: cam_line_offset_next = mem1_addr[3:2];
-      default: cam_line_offset_next = cam_line_offset + 1;
-    endcase
+  logic [3:2] cam_line_offset;
   always_ff @(posedge clk_core)
-    if(~bus_stall_rdata & ~bus_stall_wdata)
-      cam_line_offset <= cam_line_offset_next;
+    if(~reset_n)
+      cam_line_offset <= '0;
+    else if(bus_beat_wdata | bus_beat_rdata)
+      cam_line_offset <= cam_line_offset + 1;
+
+  assign mem1_cam_read_tag_in = virt ? dc_tlb_read_ppn : mem1_addr[28:12];
+  assign mem1_cam_read_index = {mem1_addr[11:4],cam_line_offset};
 
   logic        cam_rword_wen;
   logic [31:0] cam_rword, cam_rword_next;
@@ -401,14 +387,13 @@ module stage_memory1(
     endcase
   end
 
-  logic        cam_exc;
+  logic cam_exc;
   always_comb begin
     // set default values of outputs
     cam_state_next = cam_state;
     cam_exc = 0;
 
     mem1_cam_read_req = 0;
-    mem1_cam_read_index = '0;
 
     mem1_cam_write_index = '0;
 
@@ -455,8 +440,7 @@ module stage_memory1(
               mem1_wmask = '1;
 
               // read word from cache
-              mem1_cam_read_req = ~bus_stall_wdata;
-              mem1_cam_read_index = {mem1_addr[11:4],cam_line_offset_next};
+              mem1_cam_read_req = bmain_wready_mem1;
 
               cam_state_next = '{evict:1,default:0};
             end else begin
@@ -485,19 +469,18 @@ module stage_memory1(
       cam_state.evict: begin
         // continue bus write
         mem1_wvalid = 1;
-        mem1_wlast = cam_line_offset_next == mem1_addr[3:2];
+        mem1_wlast = cam_line_offset == 'd3;
         mem1_bus_wdata = dc_cam_read_data;
         mem1_wmask = '1;
 
         // not last word?
-        if(cam_line_offset_next != mem1_addr[3:2]) begin
+        if(~mem1_wlast) begin
           // read word from cache
-          mem1_cam_read_req = ~bus_stall_wdata;
-          mem1_cam_read_index = {mem1_addr[11:4],cam_line_offset_next};
+          mem1_cam_read_req = bmain_wready_mem1;
         end else begin
           // mark line invalid
-          mem1_cam_write_req_tag_flags = ~bus_stall_wdata;
-          mem1_cam_write_flags = 0;
+          mem1_cam_write_req_tag_flags = bmain_wready_mem1;
+          mem1_cam_write_flags = '0;
 
           cam_state_next = '{fill0:1,default:0};
         end
@@ -513,24 +496,24 @@ module stage_memory1(
       end
 
       cam_state.fill1: begin
+        // continue bus read
+        mem1_rready = 1;
+
         // write word to cache
         mem1_cam_write_index = {mem1_addr[11:4],cam_line_offset};
         mem1_cam_write_req_data = 1;
         mem1_cam_write_data = bmain_rdata;
         mem1_cam_write_mask = '1;
 
-        // first word?
-        if(cam_line_offset_next ^ 'b10 == mem1_addr[3:2]) begin
+        // is this the desired word?
+        if(cam_line_offset == mem1_addr[3:2]) begin
           // capture read data
           cam_rword_wen = 1;
           cam_rword_next = bmain_rdata;
         end
 
-        // not last word?
-        if(cam_line_offset_next != mem1_addr[3:2])
-          // continue bus read
-          mem1_rready = 1;
-        else begin
+        // last word?
+        if(bmain_rlast) begin
           // mark line valid
           mem1_cam_write_req_tag_flags = 1;
           mem1_cam_write_tag = mem1_cam_read_tag_in;
