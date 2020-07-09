@@ -21,9 +21,6 @@ module icache(
 
   input logic [28:12]  fe1_cam_read_tag_in,
 
-  input logic          fe1_cam_read_req,
-  input logic [11:2]   fe1_cam_read_index,
-
   input logic [11:2]   fe1_cam_write_index,
 
   input logic          fe1_cam_write_req_data,
@@ -76,8 +73,8 @@ module icache(
     .reset_n(reset_n),
 
     // read inputs
-    .read_req(fe0_read_req | fe1_cam_read_req),
-    .read_index(fe1_cam_read_req ? fe1_cam_read_index : fe0_read_addr[11:2]),
+    .read_req(fe0_read_req),
+    .read_index(fe0_read_addr[11:2]),
     .read_tag_in(fe1_cam_read_tag_in),
 
     // read outputs

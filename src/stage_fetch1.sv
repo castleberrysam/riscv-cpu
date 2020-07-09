@@ -33,9 +33,6 @@ module stage_fetch1(
 
   output logic [28:12] fe1_cam_read_tag_in,
 
-  output logic         fe1_cam_read_req,
-  output logic [11:2]  fe1_cam_read_index,
-
   output logic [11:2]  fe1_cam_write_index,
 
   output logic         fe1_cam_write_req_data,
@@ -266,9 +263,6 @@ module stage_fetch1(
     // set default values of outputs
     cam_state_next = cam_state;
     cam_exc = 0;
-
-    fe1_cam_read_req = 0;
-    fe1_cam_read_index = 0;
 
     fe1_cam_write_index = 0;
 

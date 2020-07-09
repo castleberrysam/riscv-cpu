@@ -152,8 +152,6 @@ module top(
   logic                 fe0_read_req;
   logic                 fe0_valid;
   logic [28:2]          fe1_addr;
-  logic [11:2]          fe1_cam_read_index;
-  logic                 fe1_cam_read_req;
   logic                 fe1_busy;
   logic [28:12]         fe1_cam_read_tag_in;
   logic [31:0]          fe1_cam_write_data;
@@ -330,8 +328,6 @@ module top(
      .fe1_tlb_write_ppn (fe1_tlb_write_ppn[28:12]),
      .fe1_tlb_write_flags(fe1_tlb_write_flags[7:0]),
      .fe1_cam_read_tag_in(fe1_cam_read_tag_in[28:12]),
-     .fe1_cam_read_req,
-     .fe1_cam_read_index(fe1_cam_read_index[11:2]),
      .fe1_cam_write_index(fe1_cam_write_index[11:2]),
      .fe1_cam_write_req_data,
      .fe1_cam_write_data(fe1_cam_write_data[31:0]),
@@ -698,8 +694,6 @@ module top(
      .fe1_tlb_write_ppn (fe1_tlb_write_ppn[28:12]),
      .fe1_tlb_write_flags(fe1_tlb_write_flags[7:0]),
      .fe1_cam_read_tag_in(fe1_cam_read_tag_in[28:12]),
-     .fe1_cam_read_req,
-     .fe1_cam_read_index(fe1_cam_read_index[11:2]),
      .fe1_cam_write_index(fe1_cam_write_index[11:2]),
      .fe1_cam_write_req_data,
      .fe1_cam_write_data(fe1_cam_write_data[31:0]),
