@@ -7,6 +7,7 @@ read_mem rom.mif
 
 synth_design -top top_fpga -verilog_define XILINX -flatten_hierarchy none
 opt_design
+write_checkpoint -force timing.dcp
 
 report_timing
 report_utilization

@@ -16,7 +16,7 @@ axsim.sh: xsim.dir/work/work.rlx
 
 xsim.dir/work/work.rlx: $(SRCS) $(HDRS) ../fpga/ip
 	xvlog --sv --relax $(DEFINES) $(SRCS)
-	xvlog --relax $(MIG_DIR)/dram_mig_mig_sim.v $(shell find $(MIG_DIR) -mindepth 2 -type f -name \*.v) $(XILINX_VIVADO)/data/verilog/src/glbl.v
+	xvlog --relax $(MIG_DIR)/dram_mig.v $(MIG_DIR)/dram_mig_mig_sim.v $(shell find $(MIG_DIR) -mindepth 2 -type f -name \*.v) $(XILINX_VIVADO)/data/verilog/src/glbl.v
 
 ../fpga/ip:
 	make -C ../fpga ip

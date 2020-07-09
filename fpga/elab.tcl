@@ -6,3 +6,4 @@ read_ip ip/dram_mig/dram_mig.xci
 read_mem rom.mif
 
 synth_design -rtl -top top_fpga -verilog_define XILINX
+write_checkpoint -force elab.dcp

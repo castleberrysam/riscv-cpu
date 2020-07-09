@@ -4,6 +4,7 @@ doc/
 *.elf
 *.hex
 *.vcd
+*.dcp
 
 sim/*.jou
 sim/*.log

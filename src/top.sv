@@ -879,7 +879,7 @@ module top(
      .mig_rdata,
      .bmain_rready_dctl);
 
-  dram_mig_mig dram_mig(
+  dram_mig dram_mig(
     .ddr3_addr          (ddr3_addr),
     .ddr3_ba            (ddr3_ba),
     .ddr3_ras_n         (ddr3_ras_n),

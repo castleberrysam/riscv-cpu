@@ -360,5 +360,6 @@ set_property -dict {
 
 ##################################################################
 
-set_property GENERATE_SYNTH_CHECKPOINT 0 [get_files [get_property IP_FILE $ip_obj]]
+#set_property GENERATE_SYNTH_CHECKPOINT 0 [get_files [get_property IP_FILE $ip_obj]]
 generate_target all $ip_obj
+synth_ip $ip_obj
