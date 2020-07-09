@@ -11,9 +11,8 @@ module stage_decode(
   output logic [31:2] de_newpc,
   
   // fetch1 inputs/outputs
-  output logic        de_valid,
-
   input logic         fe1_valid,
+  input logic         fe1_stall,
   output logic        de_stall,
   input logic         fe1_exc,
   input logic [31:2]  fe1_pc,
@@ -26,6 +25,7 @@ module stage_decode(
 
   input logic [31:0]  ex_fwd_data,
 
+  output logic        de_valid,
   output logic        de_exc,
   output ecause_t     de_exc_cause,
   output logic [31:2] de_pc,
@@ -61,7 +61,7 @@ module stage_decode(
   input logic [31:0]  mem1_fwd_data,
 
   // csr inputs
-  input logic         csr_kill_setpc,
+  input logic         csr_kill,
 
   // writeback inputs
   input logic         wb_valid,
@@ -77,15 +77,15 @@ module stage_decode(
   output logic [4:0]  de_rs2
   );
 
-  logic fe1_exc_r;
-
+  logic        fe1_exc_r;
   logic [31:0] de_insn;
   always_ff @(posedge clk_core)
-    if(~reset_n)
+    if(~reset_n) begin
       de_valid <= 0;
-    else if(~de_stall) begin
-      de_valid <= fe1_valid;
-      fe1_exc_r <= fe1_exc;
+      fe1_exc_r <= 0;
+    end else if(~de_stall | csr_kill) begin
+      de_valid <= fe1_valid & ~fe1_stall & ~fe1_exc & ~csr_kill;
+      fe1_exc_r <= fe1_exc & ~csr_kill;
       de_pc <= fe1_pc;
 
       de_insn <= fe1_insn;
@@ -332,11 +332,12 @@ module stage_decode(
   assign eret   = special & (rs2[1:0] == 'b10);
 
   always_comb begin
-    de_exc = ~csr_kill_setpc & ~test_stop;
+    de_exc = fe1_exc_r;
     de_exc_cause = IFAULT;
-    unique if(fe1_exc_r)
-      de_exc_cause = IFAULT;
+    if(test_stop)
+      de_exc = 0;
     else if(de_valid) begin
+      de_exc = 1;
       if(format.invalid)
         // imm = de_insn (in immediate decoder)
         de_exc_cause = IILLEGAL;
@@ -350,21 +351,13 @@ module stage_decode(
         de_exc_cause = ERET;
       else
         de_exc = 0;
-    end else
-      de_exc = 0;
+    end
   end
 
   logic jalr_stall;
   assign jalr_stall = jalr & fwd_rs1.ex;
 
-  assign de_stall = de_valid & (ex_stall | test_stop | jalr_stall | fwd_stall);
-  /*
-  always_ff @(posedge clk_core)
-    if(~reset_n)
-      ex_valid <= 0;
-    else
-      ex_valid <= ex_stall | (de_valid & ~de_stall & ~ex_br_miss & ~exc & ~wb_exc);
-   */
+  assign de_stall = (de_valid & (ex_stall | test_stop | jalr_stall | fwd_stall)) | (de_exc & ex_stall);
 
 `ifndef SYNTHESIS
   always_ff @(posedge clk_core)

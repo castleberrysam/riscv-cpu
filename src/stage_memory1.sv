@@ -8,6 +8,7 @@ module stage_memory1(
 
   // memory0 inputs/outputs
   input logic          mem0_valid,
+  input logic          mem0_stall,
   output logic         mem1_stall,
   input logic          mem0_exc,
   input ecause_t       mem0_exc_cause,
@@ -94,7 +95,7 @@ module stage_memory1(
   input logic          csr_flush,
   input logic [31:0]   csr_dout,
 
-  input logic          csr_kill_setpc,
+  input logic          csr_kill,
 
   input logic [31:0]   csr_satp,
 
@@ -109,6 +110,8 @@ module stage_memory1(
   output ecause_t      mem1_exc_cause,
   output logic         mem1_flush,
   output logic [31:2]  mem1_pc,
+
+  output logic         mem1_busy,
 
   output logic [4:0]   mem1_wb_reg,
   output logic [31:0]  mem1_dout
@@ -125,14 +128,15 @@ module stage_memory1(
   logic [1:0]  mem1_width;
   logic [31:0] mem1_addr, mem1_wdata;
   always_ff @(posedge clk_core)
-    if(~reset_n)
+    if(~reset_n) begin
       mem1_valid <= 0;
-    else begin
+      mem0_exc_r <= 0;
+    end else begin
       mem1_mem1_req <= mem0_mem1_req;
       mem1_fe1_req <= mem0_fe1_req;
-      if(~mem1_stall) begin
-        mem1_valid <= mem0_valid;
-        mem0_exc_r <= mem0_exc;
+      if(~mem1_stall | csr_kill) begin
+        mem1_valid <= mem0_valid & ~mem0_stall & ~mem0_exc & ~csr_kill;
+        mem0_exc_r <= mem0_exc & ~csr_kill;
         mem0_exc_cause_r <= mem0_exc_cause;
         mem1_pc <= mem0_pc;
 
@@ -153,8 +157,8 @@ module stage_memory1(
   assign mem1_fwd_data = mem1_addr;
 
   logic dc_access, csr_access;
-  assign dc_access = mem1_read ^ mem1_write;
-  assign csr_access = mem1_read & mem1_write;
+  assign dc_access = mem1_valid & (mem1_read ^ mem1_write);
+  assign csr_access = mem1_valid & mem1_read & mem1_write;
 
   assign mem1_csr_addr = mem1_addr[11:0];
   assign mem1_csr_write = csr_access ? mem1_width : '0;
@@ -163,19 +167,17 @@ module stage_memory1(
   assign mem1_flush = csr_flush;
 
   always_comb begin
-    mem1_exc = 1;
+    mem1_exc = mem0_exc_r;
     mem1_exc_cause = mem0_exc_cause_r;
-    unique if(mem0_exc_r)
-      mem1_exc_cause = mem0_exc_cause_r;
-    else if(mem1_valid) begin
+    if(mem1_valid) begin
+      mem1_exc = 1;
       if(tlb_exc | cam_exc | bmain_error_mem1)
         mem1_exc_cause = mem1_write ? SPFAULT : LPFAULT;
       else if(csr_access & csr_error)
         mem1_exc_cause = IILLEGAL;
       else
         mem1_exc = 0;
-    end else
-      mem1_exc = 0;
+    end
   end
 
   // tlb state machine
@@ -186,13 +188,13 @@ module stage_memory1(
   always_ff @(posedge clk_core)
     if(~reset_n)
       tlb_state <= '{idle:1,default:0};
-    else if(csr_kill_setpc)
+    else if(csr_kill)
       tlb_state <= '{idle:1,default:0};
     else
       tlb_state <= tlb_state_next;
 
   logic tlb_stall;
-  assign tlb_stall = ~csr_kill_setpc & ~tlb_state_next.idle;
+  assign tlb_stall = ~tlb_state_next.idle;
 
   logic         satp_mode;
   logic [8:0]   satp_asid;
@@ -242,7 +244,7 @@ module stage_memory1(
 
     unique case(1)
       tlb_state.idle:
-        if(mem1_valid & dc_access & virt)
+        if(dc_access & virt)
           // tlb miss or stale dirty bit?
           if(~dc_tlb_read_hit | tlb_set_dirty) begin
             // read first-level PTE
@@ -437,7 +439,7 @@ module stage_memory1(
     unique case(1)
       cam_state.idle: begin
         // tlb hit?
-        if(mem1_valid & dc_access & ~csr_kill_setpc & (~virt | cam_tlb_hit))
+        if(dc_access & ~csr_kill & (~virt | dc_tlb_read_hit))
           // cam miss?
           if(~dc_cam_read_hit) begin
             // need to evict?
@@ -543,8 +545,9 @@ module stage_memory1(
     endcase
   end
 
-  assign mem1_stall = mem1_valid & (tlb_stall | cam_stall | wb_stall);
   assign mem1_dout = csr_access ? csr_dout : cam_dout;
 
-endmodule
+  assign mem1_busy = mem1_valid & cam_stall;
+  assign mem1_stall = (mem1_valid & (tlb_stall | cam_stall | wb_stall)) | (mem1_exc & wb_stall);
 
+endmodule

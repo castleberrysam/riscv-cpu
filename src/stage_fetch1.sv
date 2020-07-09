@@ -46,8 +46,6 @@ module stage_fetch1(
   output logic [1:0]   fe1_cam_write_flags,
 
   // decode inputs/outputs
-  input logic          de_valid,
-  
   output logic         fe1_valid,
   input logic          de_stall,
   output logic         fe1_exc,
@@ -73,9 +71,12 @@ module stage_fetch1(
   input logic [31:0]   mem1_dout,
 
   // csr inputs
-  input logic          csr_kill_setpc,
+  input logic          csr_kill,
 
   input logic [31:0]   csr_satp,
+
+  // write outputs
+  output logic         fe1_busy,
 
   // bus inputs/outputs
   output logic         fe1_cvalid,
@@ -108,13 +109,13 @@ module stage_fetch1(
   always_ff @(posedge clk_core)
     if(~reset_n)
       tlb_state <= '{idle:1,default:0};
-    else if(csr_kill_setpc)
+    else if(csr_kill)
       tlb_state <= '{idle:1,default:0};
     else
       tlb_state <= tlb_state_next;
 
   logic tlb_stall;
-  assign tlb_stall = ~csr_kill_setpc & ~tlb_state_next.idle;
+  assign tlb_stall = ~tlb_state_next.idle;
 
   logic         satp_mode;
   logic [8:0]   satp_asid;
@@ -297,7 +298,7 @@ module stage_fetch1(
     unique case(1)
       cam_state.idle: begin
         // tlb hit, cam miss?
-        if(fe1_valid & ~csr_kill_setpc & (~satp_mode | cam_tlb_hit) & ~ic_cam_read_hit)
+        if(fe1_valid & ~csr_kill & (~satp_mode | cam_tlb_hit) & ~ic_cam_read_hit)
           // need to evict?
           // if(ic_cam_read_flags[0] & ic_cam_read_flags[1]) begin
           //   // initiate bus write
@@ -393,7 +394,8 @@ module stage_fetch1(
     endcase
   end
 
-  assign fe1_stall = fe1_valid & (tlb_stall | cam_stall | de_stall);
+  assign fe1_busy = fe1_valid & cam_stall;
+  assign fe1_stall = (fe1_valid & (tlb_stall | cam_stall | de_stall)) | (fe1_exc & de_stall);
   assign fe1_exc = tlb_exc | cam_exc | bmain_error_fe1;
 
 endmodule

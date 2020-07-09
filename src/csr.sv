@@ -23,8 +23,8 @@ module csr(
   input logic [31:0]  wb_data,
 
   // fetch0 outputs
-  output logic        csr_fe_inhibit,
-  output logic        csr_kill_setpc,
+  output logic        csr_kill,
+  output logic        csr_setpc,
   output logic [31:2] csr_newpc,
 
   output logic [31:0] csr_satp
@@ -68,9 +68,8 @@ module csr(
     else if(wb_valid)
       instret <= instret + 1;
 
-  logic exc, flush, eret;
+  logic exc, eret;
   assign exc = wb_exc & ~wb_stall;
-  assign flush = wb_valid & wb_flush & ~wb_stall;
   assign eret = wb_exc_cause == ERET;
 
   // since we currently only have M mode, we only need to implement:
@@ -162,13 +161,12 @@ module csr(
       mtval <= exc_tval;
 
   always_comb begin
-    csr_fe_inhibit = flush;
-    csr_kill_setpc = exc | flush;
-    unique case(1)
-      exc: csr_newpc = ~eret ? mtvec[31:2] : mepc;
-      flush: csr_newpc = wb_pc;
-      default: csr_newpc = '0;
-    endcase
+    csr_kill = (wb_exc & ~wb_stall) | (wb_valid & wb_flush);
+    csr_setpc = (wb_exc | (wb_valid & wb_flush)) & ~wb_stall;
+    if(wb_exc)
+      csr_newpc = ~eret ? mtvec[31:2] : mepc;
+    else
+      csr_newpc = wb_pc;
   end
 
   // read port

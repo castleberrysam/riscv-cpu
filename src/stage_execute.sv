@@ -8,6 +8,7 @@ module stage_execute(
 
   // decode inputs/outputs
   input logic         de_valid,
+  input logic         de_stall,
   input logic         de_exc,
   input ecause_t      de_exc_cause,
   input logic [31:2]  de_pc,
@@ -57,7 +58,7 @@ module stage_execute(
   output logic [4:0]  ex_wb_reg,
 
   // csr inputs
-  input logic         csr_kill_setpc,
+  input logic         csr_kill,
 
   // writeback inputs
   input logic         wb_exc,
@@ -75,11 +76,12 @@ module stage_execute(
   logic        ex_br, ex_br_inv, ex_br_taken;
   logic        ex_br_misalign, ex_br_miss_misalign;
   always_ff @(posedge clk_core)
-    if(~reset_n)
+    if(~reset_n) begin
       ex_valid <= 0;
-    else if(~ex_stall) begin
-      ex_valid <= de_valid;
-      de_exc_r <= de_exc;
+      de_exc_r <= 0;
+    end else if(~ex_stall | csr_kill) begin
+      ex_valid <= de_valid & ~de_stall & ~de_exc & ~csr_kill;
+      de_exc_r <= de_exc & ~csr_kill;
       de_exc_cause_r <= de_exc_cause;
       ex_pc <= de_pc;
 
@@ -174,19 +176,20 @@ module stage_execute(
   end
 
   always_comb begin
-    ex_exc = 1;
+    ex_exc = de_exc_r;
     ex_exc_cause = de_exc_cause_r;
-    unique if(de_exc_r)
-      ex_exc_cause = de_exc_cause_r;
-    else if(ex_valid & ex_br & ex_br_miss & ex_br_misalign)
-      ex_exc_cause = IALIGN;
-    else if(ex_valid & ex_br & ~ex_br_miss & ex_br_miss_misalign)
-      ex_exc_cause = IALIGN;
-    else
-      ex_exc = 0;
+    if(ex_valid) begin
+      ex_exc = 1;
+      if(ex_br & ex_br_miss & ex_br_misalign)
+        ex_exc_cause = IALIGN;
+      else if(ex_br & ~ex_br_miss & ex_br_miss_misalign)
+        ex_exc_cause = IALIGN;
+      else
+        ex_exc = 0;
+    end
   end
 
-  assign ex_stall = ex_valid & (mem0_stall | (mul_go & ~mul_done));
+  assign ex_stall = (ex_valid & (mem0_stall | (mul_go & ~mul_done))) | (ex_exc & mem0_stall);
 
 `ifndef SYNTHESIS
   always_ff @(posedge clk_core)

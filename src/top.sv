@@ -80,11 +80,11 @@ module top(
   logic                 bmmio_wvalid_spi;
   logic [31:0]          csr_dout;
   logic                 csr_error;
-  logic                 csr_fe_inhibit;
   logic                 csr_flush;
-  logic                 csr_kill_setpc;
+  logic                 csr_kill;
   logic [31:2]          csr_newpc;
   logic [31:0]          csr_satp;
+  logic                 csr_setpc;
   logic [31:0]          dc_cam_read_data;
   logic [1:0]           dc_cam_read_flags;
   logic                 dc_cam_read_hit;
@@ -154,6 +154,7 @@ module top(
   logic [28:2]          fe1_addr;
   logic [11:2]          fe1_cam_read_index;
   logic                 fe1_cam_read_req;
+  logic                 fe1_busy;
   logic [28:12]         fe1_cam_read_tag_in;
   logic [31:0]          fe1_cam_write_data;
   logic [1:0]           fe1_cam_write_flags;
@@ -210,6 +211,7 @@ module top(
   logic                 mem0_write;
   logic [28:2]          mem1_bus_addr;
   logic [31:0]          mem1_bus_wdata;
+  logic                 mem1_busy;
   logic [11:2]          mem1_cam_read_index;
   logic                 mem1_cam_read_req;
   logic [28:12]         mem1_cam_read_tag_in;
@@ -312,8 +314,8 @@ module top(
      .fe1_stall,
      .de_setpc,
      .de_newpc          (de_newpc[31:2]),
-     .csr_fe_inhibit,
-     .csr_kill_setpc,
+     .csr_kill,
+     .csr_setpc,
      .csr_newpc         (csr_newpc[31:2]),
      .csr_satp          (csr_satp[31:0]));
 
@@ -342,6 +344,7 @@ module top(
      .fe1_insn          (fe1_insn[31:0]),
      .fe1_mem0_read,
      .fe1_mem0_addr     (fe1_mem0_addr[28:2]),
+     .fe1_busy,
      .fe1_cvalid,
      .fe1_cmd,
      .fe1_addr          (fe1_addr[28:2]),
@@ -360,7 +363,6 @@ module top(
      .ic_cam_read_tag_out(ic_cam_read_tag_out[28:12]),
      .ic_cam_read_data  (ic_cam_read_data[31:0]),
      .ic_cam_read_flags (ic_cam_read_flags[1:0]),
-     .de_valid,
      .de_stall,
      .ex_valid,
      .mem0_valid,
@@ -369,7 +371,7 @@ module top(
      .mem1_exc,
      .mem1_exc_cause,
      .mem1_dout         (mem1_dout[31:0]),
-     .csr_kill_setpc,
+     .csr_kill,
      .csr_satp          (csr_satp[31:0]),
      .bmain_cready_fe1,
      .bmain_rvalid_fe1,
@@ -382,8 +384,8 @@ module top(
      // Outputs
      .de_setpc,
      .de_newpc          (de_newpc[31:2]),
-     .de_valid,
      .de_stall,
+     .de_valid,
      .de_exc,
      .de_exc_cause,
      .de_pc             (de_pc[31:2]),
@@ -411,6 +413,7 @@ module top(
      .clk_core,
      .reset_n,
      .fe1_valid,
+     .fe1_stall,
      .fe1_exc,
      .fe1_pc            (fe1_pc[31:2]),
      .fe1_insn          (fe1_insn[31:0]),
@@ -419,7 +422,7 @@ module top(
      .ex_fwd_data       (ex_fwd_data[31:0]),
      .mem0_fwd_data     (mem0_fwd_data[31:0]),
      .mem1_fwd_data     (mem1_fwd_data[31:0]),
-     .csr_kill_setpc,
+     .csr_kill,
      .wb_valid,
      .wb_reg            (wb_reg[4:0]),
      .wb_data           (wb_data[31:0]),
@@ -448,6 +451,7 @@ module top(
      .clk_core,
      .reset_n,
      .de_valid,
+     .de_stall,
      .de_exc,
      .de_exc_cause,
      .de_pc             (de_pc[31:2]),
@@ -470,7 +474,7 @@ module top(
      .de_mem_width      (de_mem_width[1:0]),
      .de_wb_reg         (de_wb_reg[4:0]),
      .mem0_stall,
-     .csr_kill_setpc,
+     .csr_kill,
      .wb_exc);
 
   stage_memory0 memory0
@@ -499,6 +503,7 @@ module top(
      .clk_core,
      .reset_n,
      .ex_valid,
+     .ex_stall,
      .ex_exc,
      .ex_exc_cause,
      .ex_pc             (ex_pc[31:2]),
@@ -511,6 +516,7 @@ module top(
      .ex_wb_reg         (ex_wb_reg[4:0]),
      .fe1_mem0_read,
      .fe1_mem0_addr     (fe1_mem0_addr[28:2]),
+     .csr_kill,
      .csr_satp          (csr_satp[31:0]),
      .mem1_stall,
      .mem1_mem0_read,
@@ -558,12 +564,14 @@ module top(
      .mem1_exc_cause,
      .mem1_flush,
      .mem1_pc           (mem1_pc[31:2]),
+     .mem1_busy,
      .mem1_wb_reg       (mem1_wb_reg[4:0]),
      .mem1_dout         (mem1_dout[31:0]),
      // Inputs
      .clk_core,
      .reset_n,
      .mem0_valid,
+     .mem0_stall,
      .mem0_exc,
      .mem0_exc_cause,
      .mem0_pc           (mem0_pc[31:2]),
@@ -593,7 +601,7 @@ module top(
      .csr_error,
      .csr_flush,
      .csr_dout          (csr_dout[31:0]),
-     .csr_kill_setpc,
+     .csr_kill,
      .csr_satp          (csr_satp[31:0]),
      .wb_stall);
 
@@ -601,9 +609,9 @@ module top(
     (/*AUTOINST*/
      // Outputs
      .wb_stall,
-     .wb_valid,
      .wb_reg            (wb_reg[4:0]),
      .wb_data           (wb_data[31:0]),
+     .wb_valid,
      .wb_exc,
      .wb_exc_cause,
      .wb_flush,
@@ -611,15 +619,17 @@ module top(
      // Inputs
      .clk_core,
      .reset_n,
-     .fe1_stall,
+     .fe1_busy,
      .mem1_valid_wb,
+     .mem1_stall,
      .mem1_exc,
      .mem1_exc_cause,
      .mem1_flush,
      .mem1_pc           (mem1_pc[31:2]),
-     .mem1_stall,
+     .mem1_busy,
      .mem1_wb_reg       (mem1_wb_reg[4:0]),
-     .mem1_dout         (mem1_dout[31:0]));
+     .mem1_dout         (mem1_dout[31:0]),
+     .csr_kill);
 
   forward_unit fwd_unit
     (/*AUTOINST*/
@@ -646,8 +656,8 @@ module top(
      .csr_error,
      .csr_flush,
      .csr_dout          (csr_dout[31:0]),
-     .csr_fe_inhibit,
-     .csr_kill_setpc,
+     .csr_kill,
+     .csr_setpc,
      .csr_newpc         (csr_newpc[31:2]),
      .csr_satp          (csr_satp[31:0]),
      // Inputs
