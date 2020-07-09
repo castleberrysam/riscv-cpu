@@ -133,7 +133,7 @@ def run_qemu(elf_file):
             addr_hex = parts[1]
             if addr_hex[-1] == ":":
                 addr_hex = addr_hex[:-1]
-            insn = Insn(int(addr_hex, 16))
+            insn = Insn(int(addr_hex, 16) - 0x80000000)
             skip = 2
             continue
         # else, new value for reg

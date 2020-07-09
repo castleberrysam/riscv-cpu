@@ -132,4 +132,12 @@ module tlb(
       end
   end
 
+  // TODO will not work for synthesis
+  initial begin
+    for(int i=0;i<1024;i++)
+      super_mem[i] = '0;
+    for(int i=0;i<512;i++)
+      data_mem[i] = '0;
+  end
+
 endmodule

@@ -277,6 +277,10 @@ module stage_memory1(
           mem1_tlb_write_ppn = pte.ppn;
           mem1_tlb_write_flags = pte.flags;
 
+          // redo the initial access
+          mem1_mem0_read = 1;
+          mem1_mem0_addr = mem1_addr;
+
           tlb_state_next = '{idle:1,default:0};
         end
 
@@ -294,6 +298,10 @@ module stage_memory1(
           mem1_tlb_write_tag = mem1_addr[31:21];
           mem1_tlb_write_ppn = pte.ppn;
           mem1_tlb_write_flags = pte.flags;
+
+          // redo the initial access
+          mem1_mem0_read = 1;
+          mem1_mem0_addr = mem1_addr;
 
           tlb_state_next = '{idle:1,default:0};
         end
@@ -528,7 +536,12 @@ module stage_memory1(
     endcase
   end
 
-  assign mem1_dout = csr_access ? csr_dout : cam_dout;
+  always_comb
+    unique case(1)
+      dc_access: mem1_dout = cam_dout;
+      csr_access: mem1_dout = csr_dout;
+      default: mem1_dout = mem1_addr;
+    endcase
 
   assign mem1_busy = mem1_valid & cam_stall;
   assign mem1_stall = (mem1_valid & (tlb_stall | cam_stall | wb_stall)) | (mem1_exc & wb_stall);

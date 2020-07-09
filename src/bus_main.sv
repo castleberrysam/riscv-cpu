@@ -172,8 +172,8 @@ module bus_main(
   end
   
   logic rdata_done, wdata_done;
-  assign rdata_done = rdata_beat_in & rlast;
-  assign wdata_done = wdata_beat_out & wlast;
+  assign rdata_done = rdata_beat_in & rlast_in;
+  assign wdata_done = wdata_beat_out & mem1_wlast;
   assign cmd_done = cmd_valid & (cmd ? rdata_done : wdata_done);
 
   assign bmain_cready_fe1 = ~mem1_cvalid & (~cmd_valid | cmd_done);

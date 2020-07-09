@@ -104,4 +104,12 @@ module cam(
       end
   end
 
+  // TODO will not work for synthesis
+  initial begin
+    for(int i=0;i<256;i++) begin
+      tag_mem[i] = '0;
+      lru_mem[i] = 0;
+    end
+  end
+
 endmodule

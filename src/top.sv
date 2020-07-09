@@ -271,7 +271,7 @@ module top(
   logic [31:0] flash_rdata;
   logic        flash_error;
   assign flash_cready = 0;
-  assign flash_ready = 0;
+  assign flash_wready = 0;
   assign flash_rvalid = 0;
   assign flash_rlast = 0;
   assign flash_rdata = '0;
