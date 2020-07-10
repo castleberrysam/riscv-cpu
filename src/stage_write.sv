@@ -37,8 +37,15 @@ module stage_write(
   output logic [31:2] wb_pc
   );
 
+  logic wb_flush_r;
+  always_ff @(posedge clk_core)
+    wb_flush_r <= wb_flush;
+
   // we cannot interrupt an ongoing cache evict/fill (due to bus transactions)
-  assign wb_stall = (wb_exc | (wb_valid & wb_flush)) & (fe1_busy | mem1_busy);
+  logic exc_stall, flush_stall;
+  assign exc_stall = wb_exc & (fe1_busy | mem1_busy);
+  assign flush_stall = wb_valid & wb_flush & (~wb_flush_r | fe1_busy | mem1_busy);
+  assign wb_stall = exc_stall | flush_stall;
 
   always_ff @(posedge clk_core)
     if(~reset_n) begin

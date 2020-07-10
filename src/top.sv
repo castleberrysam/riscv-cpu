@@ -80,6 +80,7 @@ module top(
   logic                 bmmio_wvalid_spi;
   logic [31:0]          csr_dout;
   logic                 csr_error;
+  logic                 csr_fe_inhibit;
   logic                 csr_flush;
   logic                 csr_kill;
   logic [31:2]          csr_newpc;
@@ -312,7 +313,7 @@ module top(
      .fe1_stall,
      .de_setpc,
      .de_newpc          (de_newpc[31:2]),
-     .csr_kill,
+     .csr_fe_inhibit,
      .csr_setpc,
      .csr_newpc         (csr_newpc[31:2]),
      .csr_satp          (csr_satp[31:0]));
@@ -653,6 +654,7 @@ module top(
      .csr_flush,
      .csr_dout          (csr_dout[31:0]),
      .csr_kill,
+     .csr_fe_inhibit,
      .csr_setpc,
      .csr_newpc         (csr_newpc[31:2]),
      .csr_satp          (csr_satp[31:0]),

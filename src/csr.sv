@@ -24,6 +24,7 @@ module csr(
 
   // fetch0 outputs
   output logic        csr_kill,
+  output logic        csr_fe_inhibit,
   output logic        csr_setpc,
   output logic [31:2] csr_newpc,
 
@@ -161,8 +162,9 @@ module csr(
       mtval <= exc_tval;
 
   always_comb begin
-    csr_kill = (wb_exc & ~wb_stall) | (wb_valid & wb_flush);
-    csr_setpc = (wb_exc | (wb_valid & wb_flush)) & ~wb_stall;
+    csr_kill = wb_exc | (wb_valid & wb_flush);
+    csr_fe_inhibit = (wb_valid & wb_flush) | wb_stall;
+    csr_setpc = wb_exc | wb_stall;
     if(wb_exc)
       csr_newpc = ~eret ? mtvec[31:2] : mepc;
     else

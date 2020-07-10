@@ -20,7 +20,7 @@ module stage_fetch0(
   input logic [31:2]  de_newpc,
 
   // csr inputs
-  input logic         csr_kill,
+  input logic         csr_fe_inhibit,
   input logic         csr_setpc,
   input logic [31:2]  csr_newpc,
 
@@ -39,7 +39,7 @@ module stage_fetch0(
   assign fe0_read_asid = csr_satp[30:22];
 
   always_comb begin
-    fe0_read_req = (~fe1_stall | csr_setpc) & ~csr_kill;
+    fe0_read_req = (~fe1_stall | csr_setpc) & ~csr_fe_inhibit;
     if(csr_setpc)
       fe0_read_addr = csr_newpc;
     else if(de_setpc)
