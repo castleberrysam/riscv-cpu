@@ -87,6 +87,9 @@ module tb_top(
       reset_n = 0;
       #100;
       reset_n = 1;
+
+      @(posedge uut.write.test_stop);
+      #1 $finish;
     end
 
   // core clock: 100MHz
@@ -99,9 +102,5 @@ module tb_top(
   // mig ref clock: 200MHz
   always
     #2.5 clk_mig_ref = ~clk_mig_ref;
-
-  always @(posedge clk_core)
-    if(uut.decode.test_stop & ~uut.ex_valid & ~uut.mem0_valid & ~uut.mem1_valid_wb & ~uut.wb_valid & ~uut.ex_exc & ~uut.mem0_exc & ~uut.mem1_exc & ~uut.wb_exc)
-      $finish;
 
 endmodule

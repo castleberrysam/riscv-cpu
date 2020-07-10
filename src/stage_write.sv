@@ -56,6 +56,9 @@ module stage_write(
     end
 
 `ifndef SYNTHESIS
+  logic test_stop;
+  assign test_stop = wb_exc & (wb_exc_cause == IILLEGAL) & (wb_data == TEST_MAGIC);
+
   logic [31:0] retire_pc;
   always_ff @(posedge clk_core)
     if(wb_valid & ~wb_stall) begin

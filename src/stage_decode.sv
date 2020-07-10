@@ -318,13 +318,6 @@ module stage_decode(
     end
 
   // stall/valid logic
-  logic test_stop;
-`ifndef SYNTHESIS
-  assign test_stop = de_insn == TEST_MAGIC;
-`else
-  assign test_stop = 0;
-`endif
-
   logic special, ecall, ebreak, eret;
   assign special = (opcode == SYSTEM) & ~|funct3[1:0];
   assign ecall  = special & (rs2[1:0] == 'b00);
@@ -334,9 +327,7 @@ module stage_decode(
   always_comb begin
     de_exc = fe1_exc_r;
     de_exc_cause = IFAULT;
-    if(test_stop)
-      de_exc = 0;
-    else if(de_valid) begin
+    if(de_valid) begin
       de_exc = 1;
       if(format.invalid)
         // imm = de_insn (in immediate decoder)
@@ -357,7 +348,7 @@ module stage_decode(
   logic jalr_stall;
   assign jalr_stall = jalr & fwd_rs1.ex;
 
-  assign de_stall = (de_valid & (ex_stall | test_stop | jalr_stall | fwd_stall)) | (de_exc & ex_stall);
+  assign de_stall = (de_valid & (ex_stall | jalr_stall | fwd_stall)) | (de_exc & ex_stall);
 
 `ifndef SYNTHESIS
   always_ff @(posedge clk_core)
