@@ -31,7 +31,7 @@ module rom(
       cmd_valid <= 1;
       offset <= 'd0;
       addr <= bmain_addr[15:4];
-    end else if(~rom_rvalid | bmain_rready_rom) begin
+    end else if((offset == 'd0) | bmain_rready_rom) begin
       if(rlast)
         cmd_valid <= 0;
       offset <= offset + 'd1;

@@ -902,7 +902,7 @@ module top(
 
     .sys_clk_i          (clk_mig_sys),
     .clk_ref_i          (clk_mig_ref),
-    .sys_rst            (~reset_n),
+    .sys_rst            (reset_n),
 
     .ui_clk             (mig_ui_clk),
     .ui_clk_sync_rst    (mig_ui_reset),

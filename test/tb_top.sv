@@ -91,14 +91,14 @@ module tb_top(
 
   // core clock: 100MHz
   always
-    #10 clk_core = ~clk_core;
+    #5 clk_core = ~clk_core;
 
   // mig system clock: 100MHz
   assign clk_mig_sys = clk_core;
   
   // mig ref clock: 200MHz
   always
-    #5 clk_mig_ref = ~clk_mig_ref;
+    #2.5 clk_mig_ref = ~clk_mig_ref;
 
   always @(posedge clk_core)
     if(uut.decode.test_stop & ~uut.ex_valid & ~uut.mem0_valid & ~uut.mem1_valid_wb & ~uut.wb_valid & ~uut.ex_exc & ~uut.mem0_exc & ~uut.mem1_exc & ~uut.wb_exc)

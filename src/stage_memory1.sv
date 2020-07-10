@@ -215,7 +215,7 @@ module stage_memory1(
   assign virt = satp_mode & ~tlb_fill_req;
 
   pte_t pte;
-  assign pte = pte_t'(dc_cam_read_data);
+  assign pte = pte_t'(cam_dout_raw);
 
   logic pte_valid, pte_leaf;
   assign pte_valid = pte.flags.v & (pte.flags.r | ~pte.flags.w);
@@ -322,7 +322,7 @@ module stage_memory1(
   assign bus_beat_rdata = mem1_rready & bmain_rvalid_mem1;
 
   struct packed {
-    logic idle, evict, fill0, fill1;
+    logic idle, evict, fill0, fill1, fill2, fill3;
   } cam_state, cam_state_next;
 
   always_ff @(posedge clk_core)
@@ -347,10 +347,10 @@ module stage_memory1(
   assign mem1_cam_read_index = {mem1_addr[11:4],cam_line_offset};
 
   logic        cam_rword_wen;
-  logic [31:0] cam_rword, cam_rword_next;
+  logic [31:0] cam_rword;
   always_ff @(posedge clk_core)
     if(cam_rword_wen)
-      cam_rword <= cam_rword_next;
+      cam_rword <= bmain_rdata;
 
   logic [31:0] cam_wdata, cam_wmask;
   always_comb begin
@@ -395,6 +395,10 @@ module stage_memory1(
     endcase
   end
 
+  assign mem1_bus_wdata = dc_cam_read_data;
+  assign mem1_wmask = '1;
+  assign mem1_cam_write_tag = mem1_cam_read_tag_in;
+
   logic cam_exc;
   always_comb begin
     // set default values of outputs
@@ -410,13 +414,10 @@ module stage_memory1(
     mem1_cam_write_mask = '0;
 
     mem1_cam_write_req_tag_flags = 0;
-    mem1_cam_write_tag = '0;
     mem1_cam_write_flags = '0;
 
-    cam_dout_sel = 0;
-
     cam_rword_wen = 0;
-    cam_rword_next = '0;
+    cam_dout_sel = 0;
 
     mem1_cvalid = 0;
     mem1_cmd = 0;
@@ -424,8 +425,6 @@ module stage_memory1(
 
     mem1_wvalid = 0;
     mem1_wlast = 0;
-    mem1_bus_wdata = '0;
-    mem1_wmask = '0;
 
     mem1_rready = 0;
 
@@ -444,8 +443,6 @@ module stage_memory1(
 
               mem1_wvalid = 1;
               mem1_wlast = 0;
-              mem1_bus_wdata = dc_cam_read_data;
-              mem1_wmask = '1;
 
               // read word from cache
               mem1_cam_read_req = bmain_wready_mem1;
@@ -463,8 +460,8 @@ module stage_memory1(
             // update accessed/dirty bits
             mem1_cam_write_index = mem1_mem0_addr[11:2];
             mem1_cam_write_req_data = 1;
-            mem1_cam_write_data = dc_cam_read_data | {mem1_write,1'b1,6'b0};
-            mem1_cam_write_mask = '1;
+            mem1_cam_write_data = {24'b0,cam_dout_raw[7:0] | {mem1_write,1'b1,6'b0}};
+            mem1_cam_write_mask = 'b0001;
           end else if(mem1_write) begin
             // write data to cache
             mem1_cam_write_index = mem1_addr[11:2];
@@ -478,8 +475,6 @@ module stage_memory1(
         // continue bus write
         mem1_wvalid = 1;
         mem1_wlast = cam_line_offset == 'd3;
-        mem1_bus_wdata = dc_cam_read_data;
-        mem1_wmask = '1;
 
         // not last word?
         if(~mem1_wlast) begin
@@ -514,25 +509,46 @@ module stage_memory1(
         mem1_cam_write_mask = '1;
 
         // is this the desired word?
-        if(cam_line_offset == mem1_addr[3:2]) begin
+        if(cam_line_offset == mem1_addr[3:2])
           // capture read data
           cam_rword_wen = 1;
-          cam_rword_next = bmain_rdata;
-        end
 
         // last word?
         if(bmain_rlast) begin
           // mark line valid
           mem1_cam_write_req_tag_flags = 1;
-          mem1_cam_write_tag = mem1_cam_read_tag_in;
           mem1_cam_write_flags = 'b01;
 
-          // issue read data
-          cam_dout_sel = 1;
-
-          cam_state_next = '{idle:1,default:0};
+          cam_state_next = '{fill2:1,default:0};
         end
        end
+
+      cam_state.fill2: begin
+        // commit write data
+        cam_dout_sel = 1;
+        if(tlb_fill_req & pte_leaf) begin
+          // update accessed/dirty bits
+          mem1_cam_write_index = mem1_mem0_addr[11:2];
+          mem1_cam_write_req_data = 1;
+          mem1_cam_write_data = {24'b0,cam_dout_raw[7:0] | {mem1_write,1'b1,6'b0}};
+          mem1_cam_write_mask = 'b0001;
+        end else if(mem1_write) begin
+          // write data to cache
+          mem1_cam_write_index = mem1_addr[11:2];
+          mem1_cam_write_req_data = 1;
+          mem1_cam_write_data = cam_wdata;
+          mem1_cam_write_mask = cam_wmask;
+        end
+
+        cam_state_next = '{fill3:1,default:0};
+      end
+
+      cam_state.fill3: begin
+        // issue read data
+        cam_dout_sel = 1;
+
+        cam_state_next = '{idle:1,default:0};
+      end
     endcase
   end
 

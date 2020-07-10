@@ -172,8 +172,8 @@ module bus_main(
   end
   
   logic rdata_done, wdata_done;
-  assign rdata_done = rdata_beat_in & rlast_in;
-  assign wdata_done = wdata_beat_out & mem1_wlast;
+  assign rdata_done = rdata_beat_out & rlast;
+  assign wdata_done = wdata_beat_out & wlast;
   assign cmd_done = cmd_valid & (cmd ? rdata_done : wdata_done);
 
   assign bmain_cready_fe1 = ~mem1_cvalid & (~cmd_valid | cmd_done);
@@ -210,7 +210,7 @@ module bus_main(
     end else if(wdata_beat_out)
       wdata_valid <= 0;
 
-  assign bmain_wready_mem1 = ~wdata_valid | wdata_beat_out;
+  assign bmain_wready_mem1 = ~wdata_valid | (wdata_beat_out & ~wlast);
   assign bmain_wvalid_flash = sel.flash & ~cmd & wdata_valid;
   assign bmain_wvalid_bmmio = sel.bmmio & ~cmd & wdata_valid;
   assign bmain_wvalid_dctl = sel.dctl & ~cmd & wdata_valid;
@@ -277,11 +277,13 @@ module bus_main(
       rdata_valid <= 1;
       rlast <= rlast_in;
       rdata <= rdata_in;
-    end else if(rdata_beat_out)
+    end else if(rdata_beat_out) begin
       rdata_valid <= 0;
+      rlast <= 0;
+    end
 
   logic rready;
-  assign rready = cmd & (~rdata_valid | rdata_beat_out);
+  assign rready = cmd & (~rdata_valid | (rdata_beat_out & ~rlast));
   assign bmain_rready_rom = sel.rom & rready;
   assign bmain_rready_flash = sel.flash & rready;
   assign bmain_rready_bmmio = sel.bmmio & rready;

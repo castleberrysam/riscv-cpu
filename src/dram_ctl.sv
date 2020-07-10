@@ -45,11 +45,29 @@ module dram_ctl(
   output logic        dctl_error
   );
 
-  logic dctl_reset_n;
-  assign dctl_reset_n = ~(~reset_n | mig_ui_reset);
-
   assign dctl_addr[1:0] = '0;
   assign dctl_error = 0;
+
+  // the block ram fifos require 2 extra clock cycles of inactivity after reset is deasserted
+  // this solution will only work as long as mig_ui_clk is faster than clk_core
+  logic [1:0] mig_ui_reset_syn;
+  always_ff @(posedge clk_core)
+    if(~reset_n)
+      mig_ui_reset_syn <= '1;
+    else
+      mig_ui_reset_syn <= {mig_ui_reset_syn[0],mig_ui_reset};
+
+  logic dctl_reset_n;
+  assign dctl_reset_n = ~(~reset_n | mig_ui_reset_syn[1]);
+
+  logic [1:0] dctl_reset_r;
+  logic       fifos_ready;
+  always_ff @(posedge clk_core)
+    if(~dctl_reset_n)
+      dctl_reset_r <= '0;
+    else
+      dctl_reset_r <= {dctl_reset_r[0],1'b1};
+  assign fifos_ready = dctl_reset_r[1];
 
   // rdata syncro
   logic        rdata_empty, rdata_afull;
@@ -135,7 +153,7 @@ module dram_ctl(
     else if(cmd_beat)
       cmd_valid <= 0;
 
-  assign dctl_cready = ~cmd_full;
+  assign dctl_cready = ~cmd_full & fifos_ready;
   assign dctl_cvalid = cmd_valid & ~dctl_wlast & (dctl_cmd[0] | wdata_mig_beat) & ~rdata_afull;
   assign cmd_fifo_read = ~cmd_empty & (~cmd_valid | cmd_beat);
 
@@ -198,7 +216,7 @@ module dram_ctl(
     else if(wdata_mig_beat)
       wdata_valid <= 0;
 
-  assign dctl_wready = ~wdata_afull;
+  assign dctl_wready = ~wdata_afull & fifos_ready;
   assign dctl_wvalid = wdata_valid & (dctl_wlast | (~dctl_cmd[0] & ~rdata_afull)) & ~wdata_empty;
   assign wdata_fifo_read = ~wdata_empty & (~wdata_valid | wdata_mig_beat);
 
