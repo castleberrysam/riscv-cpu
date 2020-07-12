@@ -111,11 +111,12 @@ module top(
   logic                 de_br_inv;
   logic                 de_br_misalign;
   logic                 de_br_miss_misalign;
-  logic                 de_br_taken;
+  logic                 de_br_pred;
   logic                 de_data1_sel;
   logic                 de_exc;
   ecause_t              de_exc_cause;
   logic [31:0]          de_imm;
+  logic                 de_jump;
   logic                 de_mem_extend;
   logic                 de_mem_read;
   logic [1:0]           de_mem_width;
@@ -128,6 +129,7 @@ module top(
   logic [4:0]           de_rs1;
   logic [4:0]           de_rs2;
   logic                 de_setpc;
+  logic                 de_speculative;
   logic                 de_stall;
   logic                 de_sub_sra;
   logic                 de_use_imm;
@@ -135,6 +137,9 @@ module top(
   logic                 de_valid;
   logic [4:0]           de_wb_reg;
   logic                 ex_br_miss;
+  logic                 ex_br_miss_nt;
+  logic                 ex_br_pred;
+  logic                 ex_br_taken;
   logic [31:0]          ex_data0;
   logic [31:0]          ex_data1;
   logic                 ex_exc;
@@ -151,9 +156,9 @@ module top(
   logic [31:2]          fe0_read_addr;
   logic [8:0]           fe0_read_asid;
   logic                 fe0_read_req;
+  logic                 fe0_speculative;
   logic                 fe0_valid;
   logic [28:2]          fe1_addr;
-  logic                 fe1_busy;
   logic [28:12]         fe1_cam_read_tag_in;
   logic [31:0]          fe1_cam_write_data;
   logic [1:0]           fe1_cam_write_flags;
@@ -168,6 +173,7 @@ module top(
   logic [31:0]          fe1_insn;
   logic [28:2]          fe1_mem0_addr;
   logic                 fe1_mem0_read;
+  logic                 fe1_mem1_kill;
   logic [31:2]          fe1_pc;
   logic                 fe1_rready;
   logic                 fe1_stall;
@@ -210,7 +216,6 @@ module top(
   logic                 mem0_write;
   logic [28:2]          mem1_bus_addr;
   logic [31:0]          mem1_bus_wdata;
-  logic                 mem1_busy;
   logic [11:2]          mem1_cam_read_index;
   logic                 mem1_cam_read_req;
   logic [28:12]         mem1_cam_read_tag_in;
@@ -304,6 +309,7 @@ module top(
     (/*AUTOINST*/
      // Outputs
      .fe0_valid,
+     .fe0_speculative,
      .fe0_read_req,
      .fe0_read_asid     (fe0_read_asid[8:0]),
      .fe0_read_addr     (fe0_read_addr[31:2]),
@@ -312,6 +318,7 @@ module top(
      .reset_n,
      .fe1_stall,
      .de_setpc,
+     .de_speculative,
      .de_newpc          (de_newpc[31:2]),
      .csr_fe_inhibit,
      .csr_setpc,
@@ -341,7 +348,7 @@ module top(
      .fe1_insn          (fe1_insn[31:0]),
      .fe1_mem0_read,
      .fe1_mem0_addr     (fe1_mem0_addr[28:2]),
-     .fe1_busy,
+     .fe1_mem1_kill,
      .fe1_cvalid,
      .fe1_cmd,
      .fe1_addr          (fe1_addr[28:2]),
@@ -351,6 +358,7 @@ module top(
      .clk_core,
      .reset_n,
      .fe0_valid,
+     .fe0_speculative,
      .fe0_read_addr     (fe0_read_addr[31:2]),
      .ic_tlb_read_hit,
      .ic_tlb_read_super,
@@ -362,6 +370,8 @@ module top(
      .ic_cam_read_flags (ic_cam_read_flags[1:0]),
      .de_stall,
      .ex_valid,
+     .ex_br_miss_nt,
+     .ex_br_taken,
      .mem0_valid,
      .mem1_valid_fe1,
      .mem1_stall,
@@ -380,6 +390,7 @@ module top(
     (/*AUTOINST*/
      // Outputs
      .de_setpc,
+     .de_speculative,
      .de_newpc          (de_newpc[31:2]),
      .de_stall,
      .de_valid,
@@ -396,7 +407,8 @@ module top(
      .de_op,
      .de_br,
      .de_br_inv,
-     .de_br_taken,
+     .de_br_pred,
+     .de_jump,
      .de_br_misalign,
      .de_br_miss_misalign,
      .de_mem_read,
@@ -415,7 +427,10 @@ module top(
      .fe1_pc            (fe1_pc[31:2]),
      .fe1_insn          (fe1_insn[31:0]),
      .ex_stall,
+     .ex_valid,
+     .ex_br_pred,
      .ex_br_miss,
+     .ex_br_taken,
      .ex_fwd_data       (ex_fwd_data[31:0]),
      .mem0_fwd_data     (mem0_fwd_data[31:0]),
      .mem1_fwd_data     (mem1_fwd_data[31:0]),
@@ -430,7 +445,10 @@ module top(
   stage_execute execute
     (/*AUTOINST*/
      // Outputs
+     .ex_br_miss_nt,
+     .ex_br_taken,
      .ex_stall,
+     .ex_br_pred,
      .ex_br_miss,
      .ex_valid,
      .ex_exc,
@@ -462,7 +480,8 @@ module top(
      .de_op,
      .de_br,
      .de_br_inv,
-     .de_br_taken,
+     .de_br_pred,
+     .de_jump,
      .de_br_misalign,
      .de_br_miss_misalign,
      .de_mem_read,
@@ -555,15 +574,14 @@ module top(
      .mem1_csr_write    (mem1_csr_write[1:0]),
      .mem1_csr_din      (mem1_csr_din[31:0]),
      .mem1_read,
-     .mem1_valid_fe1,
      .mem1_valid_wb,
      .mem1_exc,
      .mem1_exc_cause,
      .mem1_flush,
      .mem1_pc           (mem1_pc[31:2]),
-     .mem1_busy,
      .mem1_wb_reg       (mem1_wb_reg[4:0]),
      .mem1_dout         (mem1_dout[31:0]),
+     .mem1_valid_fe1,
      // Inputs
      .clk_core,
      .reset_n,
@@ -581,6 +599,7 @@ module top(
      .mem0_addr         (mem0_addr[31:0]),
      .mem0_wdata        (mem0_wdata[31:0]),
      .mem0_wb_reg       (mem0_wb_reg[4:0]),
+     .ex_br_miss,
      .dc_tlb_read_hit,
      .dc_tlb_read_super,
      .dc_tlb_read_ppn   (dc_tlb_read_ppn[28:12]),
@@ -600,7 +619,8 @@ module top(
      .csr_dout          (csr_dout[31:0]),
      .csr_kill,
      .csr_satp          (csr_satp[31:0]),
-     .wb_stall);
+     .wb_stall,
+     .fe1_mem1_kill);
 
   stage_write write
     (/*AUTOINST*/
@@ -616,14 +636,12 @@ module top(
      // Inputs
      .clk_core,
      .reset_n,
-     .fe1_busy,
      .mem1_valid_wb,
      .mem1_stall,
      .mem1_exc,
      .mem1_exc_cause,
      .mem1_flush,
      .mem1_pc           (mem1_pc[31:2]),
-     .mem1_busy,
      .mem1_wb_reg       (mem1_wb_reg[4:0]),
      .mem1_dout         (mem1_dout[31:0]),
      .csr_kill);

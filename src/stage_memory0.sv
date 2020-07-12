@@ -74,13 +74,14 @@ module stage_memory0(
 
   assign mem0_dc_asid = satp_asid;
 
+  logic valid, exc;
   always_ff @(posedge clk_core)
     if(~reset_n) begin
-      mem0_valid <= 0;
-      mem0_exc <= 0;
+      valid <= 0;
+      exc <= 0;
     end else if(~mem0_stall | csr_kill) begin
-      mem0_valid <= ex_valid & ~ex_stall & ~ex_exc & ~csr_kill;
-      mem0_exc <= ex_exc & ~csr_kill;
+      valid <= ex_valid;
+      exc <= ex_exc;
       mem0_exc_cause <= ex_exc_cause;
       mem0_pc <= ex_pc;
 
@@ -93,6 +94,9 @@ module stage_memory0(
 
       mem0_wb_reg <= ex_wb_reg;
     end
+
+  assign mem0_valid = valid & ~mem0_stall & ~exc & ~csr_kill;
+  assign mem0_exc = exc & ~csr_kill;
 
   assign mem0_mem1_req = mem1_mem0_read; 
   assign mem0_fe1_req = fe1_mem0_read;
@@ -117,6 +121,6 @@ module stage_memory0(
     end
   end
 
-  assign mem0_stall = (mem0_valid | mem0_exc) & mem1_stall;
+  assign mem0_stall = (valid | exc) & mem1_stall;
 
 endmodule

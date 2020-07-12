@@ -8,6 +8,7 @@ module stage_decode(
 
   // fetch0 outputs
   output logic        de_setpc,
+  output logic        de_speculative,
   output logic [31:2] de_newpc,
   
   // fetch1 inputs/outputs
@@ -20,12 +21,8 @@ module stage_decode(
   input logic [31:0]  fe1_insn,
 
   // execute inputs/outputs
-  input logic         ex_stall,
-  input logic         ex_br_miss,
-
-  input logic [31:0]  ex_fwd_data,
-
   output logic        de_valid,
+  input logic         ex_stall,
   output logic        de_exc,
   output ecause_t     de_exc_cause,
   output logic [31:2] de_pc,
@@ -42,7 +39,8 @@ module stage_decode(
 
   output logic        de_br,
   output logic        de_br_inv,
-  output logic        de_br_taken,
+  output logic        de_br_pred,
+  output logic        de_jump,
 
   output logic        de_br_misalign,
   output logic        de_br_miss_misalign,
@@ -53,6 +51,13 @@ module stage_decode(
   output logic [1:0]  de_mem_width,
 
   output logic [4:0]  de_wb_reg,
+
+  input logic         ex_valid,
+  input logic         ex_br_pred,
+  input logic         ex_br_miss,
+  input logic         ex_br_taken,
+
+  input logic [31:0]  ex_fwd_data,
 
   // memory0 inputs
   input logic [31:0]  mem0_fwd_data,
@@ -77,19 +82,26 @@ module stage_decode(
   output logic [4:0]  de_rs2
   );
 
+  logic kill;
+  assign kill = csr_kill | ex_br_taken;
+
+  logic        valid;
   logic        fe1_exc_r;
   logic [31:0] de_insn;
   always_ff @(posedge clk_core)
     if(~reset_n) begin
-      de_valid <= 0;
+      valid <= 0;
       fe1_exc_r <= 0;
-    end else if(~de_stall | csr_kill) begin
-      de_valid <= fe1_valid & ~fe1_stall & ~fe1_exc & ~csr_kill;
-      fe1_exc_r <= fe1_exc & ~csr_kill;
+    end else if(~de_stall | kill) begin
+      valid <= fe1_valid;
+      fe1_exc_r <= fe1_exc;
       de_pc <= fe1_pc;
 
       de_insn <= fe1_insn;
     end
+
+  assign de_valid = valid & ~de_stall & ~exc & ~kill;
+  assign de_exc = exc & ~kill;
 
   // format decoder
   struct packed {
@@ -150,8 +162,7 @@ module stage_decode(
       default: imm = 0;
     endcase
 
-  logic jump;
-  assign de_imm = jump ? 4 : imm;
+  assign de_imm = de_jump ? 4 : imm;
 
   // register file
   logic [31:0] rf_rdata1, rf_rdata2;
@@ -215,8 +226,8 @@ module stage_decode(
   // opcode[0]: set for JAL/JALR
   logic transfer, jalr;
   assign transfer = opcode[4] & ~opcode[2];
-  assign jump = transfer & opcode[0];
-  assign jalr = jump & ~opcode[1];
+  assign de_jump = transfer & opcode[0];
+  assign jalr = de_jump & ~opcode[1];
 
   logic [31:0] br_miss_pc;
   always_comb
@@ -230,16 +241,19 @@ module stage_decode(
   always_comb
     if(ex_br_miss) begin
       de_setpc = 1;
+      de_speculative = 0;
       newpc = {br_miss_pc_r,2'b0};
-    end else if(de_valid & transfer & (jump | br_take)) begin
+    end else if(valid & transfer & (de_jump | br_take) & (~ex_valid | ~ex_br_pred)) begin
       de_setpc = 1;
+      de_speculative = 1;
       if(jalr)
         newpc = (rdata1 + imm) & ~1;
       else
         newpc = {de_pc,2'b0} + imm;
     end else begin
       de_setpc = 0;
-      newpc = 0;
+      de_speculative = 0;
+      newpc = '0;
     end
 
   logic misalign;
@@ -249,7 +263,7 @@ module stage_decode(
   always_comb begin
     de_br = opcode == BRANCH;
     de_br_inv = funct3[0];
-    de_br_taken = br_take;
+    de_br_pred = br_take;
     de_br_misalign = misalign;
     de_br_miss_misalign = |br_miss_pc[1:0];
   end
@@ -324,15 +338,16 @@ module stage_decode(
   assign ebreak = special & (rs2[1:0] == 'b01);
   assign eret   = special & (rs2[1:0] == 'b10);
 
+  logic exc;
   always_comb begin
-    de_exc = fe1_exc_r;
+    exc = fe1_exc_r;
     de_exc_cause = IFAULT;
-    if(de_valid) begin
-      de_exc = 1;
+    if(valid) begin
+      exc = 1;
       if(format.invalid)
         // imm = de_insn (in immediate decoder)
         de_exc_cause = IILLEGAL;
-      else if(jump & misalign)
+      else if(de_jump & misalign)
         de_exc_cause = IALIGN;
       else if(ebreak)
         de_exc_cause = EBREAK;
@@ -341,18 +356,18 @@ module stage_decode(
       else if(eret)
         de_exc_cause = ERET;
       else
-        de_exc = 0;
+        exc = 0;
     end
   end
 
   logic jalr_stall;
   assign jalr_stall = jalr & fwd_rs1.ex;
 
-  assign de_stall = (de_valid & (ex_stall | jalr_stall | fwd_stall)) | (de_exc & ex_stall);
+  assign de_stall = (valid & (ex_stall | jalr_stall | fwd_stall)) | (exc & ex_stall);
 
 `ifndef SYNTHESIS
   always_ff @(posedge clk_core)
-    if(de_stall & ~format.invalid)
+    if(de_stall)
       $display("%d: stage_decode: stalling", $stime);
 `endif
 

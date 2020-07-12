@@ -6,9 +6,14 @@ module stage_execute(
   input logic         clk_core,
   input logic         reset_n,
 
+  // fetch1 outputs
+  output logic        ex_br_miss_nt,
+  output logic        ex_br_taken,
+
   // decode inputs/outputs
   input logic         de_valid,
   input logic         de_stall,
+  output logic        ex_stall,
   input logic         de_exc,
   input ecause_t      de_exc_cause,
   input logic [31:2]  de_pc,
@@ -25,7 +30,8 @@ module stage_execute(
 
   input logic         de_br,
   input logic         de_br_inv,
-  input logic         de_br_taken,
+  input logic         de_br_pred,
+  input logic         de_jump,
 
   input logic         de_br_misalign,
   input logic         de_br_miss_misalign,
@@ -37,7 +43,7 @@ module stage_execute(
 
   input logic [4:0]   de_wb_reg,
 
-  output logic        ex_stall,
+  output logic        ex_br_pred,
   output logic        ex_br_miss,
 
   // memory0 inputs/outputs
@@ -70,18 +76,19 @@ module stage_execute(
   logic        de_exc_r;
   ecause_t     de_exc_cause_r;
 
+  logic        valid;
   logic [31:0] ex_rdata1, ex_rdata2, ex_imm;
   logic        ex_use_pc, ex_use_imm, ex_sub_sra, ex_data1_sel;
   aluop_t      ex_op;
-  logic        ex_br, ex_br_inv, ex_br_taken;
+  logic        ex_br, ex_br_inv, ex_jump;
   logic        ex_br_misalign, ex_br_miss_misalign;
   always_ff @(posedge clk_core)
     if(~reset_n) begin
-      ex_valid <= 0;
+      valid <= 0;
       de_exc_r <= 0;
     end else if(~ex_stall | csr_kill) begin
-      ex_valid <= de_valid & ~de_stall & ~de_exc & ~csr_kill;
-      de_exc_r <= de_exc & ~csr_kill;
+      valid <= de_valid;
+      de_exc_r <= de_exc;
       de_exc_cause_r <= de_exc_cause;
       ex_pc <= de_pc;
 
@@ -97,7 +104,8 @@ module stage_execute(
 
       ex_br <= de_br;
       ex_br_inv <= de_br_inv;
-      ex_br_taken <= de_br_taken;
+      ex_br_pred <= de_br_pred;
+      ex_jump <= de_jump;
 
       ex_br_misalign <= de_br_misalign;
       ex_br_miss_misalign <= de_br_miss_misalign;
@@ -110,9 +118,16 @@ module stage_execute(
       ex_wb_reg  <= de_wb_reg;
     end
 
-  logic br_check;
-  assign br_check = ex_valid & ex_br;
-  assign ex_br_miss = br_check & (ex_br_inv ^ ex_br_taken ^ cmp_out);
+  assign ex_valid = valid & ~ex_stall & ~exc & ~csr_kill;
+  assign ex_exc = exc & ~csr_kill;
+
+  logic br_check, br_cond;
+  assign br_check = valid & ex_br;
+  assign br_cond = ex_br_inv ^ cmp_out;
+
+  assign ex_br_miss = br_check & (ex_br_pred ^ br_cond);
+  assign ex_br_miss_nt = br_check & ex_br_pred & ~br_cond;
+  assign ex_br_taken = (valid & ex_jump) | (br_check & br_cond);
 
   logic [31:0] op1, op2;
   assign op1 = ex_use_pc ? {ex_pc,2'b0} : ex_rdata1;
@@ -121,7 +136,7 @@ module stage_execute(
   logic mul_sign0, mul_sign1, mul_go;
   assign mul_sign0 = ex_op.mul | ex_op.mulh;
   assign mul_sign1 = mul_sign0 | ex_op.mulhsu;
-  assign mul_go = ex_valid & (mul_sign1 | ex_op.mulhu);
+  assign mul_go = valid & (mul_sign1 | ex_op.mulhu);
   logic        mul_done;
   logic [63:0] mul_result;
   mul_behav #(4) mul(
@@ -175,21 +190,22 @@ module stage_execute(
     ex_data1 = ex_data1_sel ? ex_rdata1 : ex_rdata2;
   end
 
+  logic exc;
   always_comb begin
-    ex_exc = de_exc_r;
+    exc = de_exc_r;
     ex_exc_cause = de_exc_cause_r;
-    if(ex_valid) begin
-      ex_exc = 1;
+    if(valid) begin
+      exc = 1;
       if(ex_br & ex_br_miss & ex_br_misalign)
         ex_exc_cause = IALIGN;
       else if(ex_br & ~ex_br_miss & ex_br_miss_misalign)
         ex_exc_cause = IALIGN;
       else
-        ex_exc = 0;
+        exc = 0;
     end
   end
 
-  assign ex_stall = (ex_valid & (mem0_stall | (mul_go & ~mul_done))) | (ex_exc & mem0_stall);
+  assign ex_stall = (valid & (mem0_stall | (mul_go & ~mul_done))) | (exc & mem0_stall);
 
 `ifndef SYNTHESIS
   always_ff @(posedge clk_core)

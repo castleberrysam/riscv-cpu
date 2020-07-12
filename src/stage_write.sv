@@ -6,9 +6,6 @@ module stage_write(
   input logic         clk_core,
   input logic         reset_n,
 
-  // fetch1 inputs
-  input logic         fe1_busy,
-
   // memory1 inputs/outputs
   input logic         mem1_valid_wb,
   input logic         mem1_stall,
@@ -17,8 +14,6 @@ module stage_write(
   input ecause_t      mem1_exc_cause,
   input logic         mem1_flush,
   input logic [31:2]  mem1_pc,
-
-  input logic         mem1_busy,
 
   input logic [4:0]   mem1_wb_reg,
   input logic [31:0]  mem1_dout,
@@ -41,19 +36,15 @@ module stage_write(
   always_ff @(posedge clk_core)
     wb_flush_r <= wb_flush;
 
-  // we cannot interrupt an ongoing cache evict/fill (due to bus transactions)
-  logic exc_stall, flush_stall;
-  assign exc_stall = wb_exc & (fe1_busy | mem1_busy);
-  assign flush_stall = wb_valid & wb_flush & (~wb_flush_r | fe1_busy | mem1_busy);
-  assign wb_stall = exc_stall | flush_stall;
+  assign wb_stall = wb_valid & wb_flush & ~wb_flush_r;
 
   always_ff @(posedge clk_core)
     if(~reset_n) begin
       wb_valid <= 0;
       wb_exc <= 0;
     end else if(~wb_stall) begin
-      wb_valid <= mem1_valid_wb & ~mem1_stall & ~mem1_exc & ~csr_kill;
-      wb_exc <= mem1_exc & ~csr_kill;
+      wb_valid <= mem1_valid_wb;
+      wb_exc <= mem1_exc;
       wb_exc_cause <= mem1_exc_cause;
       wb_flush <= mem1_flush;
       wb_pc <= mem1_pc;

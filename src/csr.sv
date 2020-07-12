@@ -69,8 +69,7 @@ module csr(
     else if(wb_valid)
       instret <= instret + 1;
 
-  logic exc, eret;
-  assign exc = wb_exc & ~wb_stall;
+  logic eret;
   assign eret = wb_exc_cause == ERET;
 
   // since we currently only have M mode, we only need to implement:
@@ -85,7 +84,7 @@ module csr(
     else if(wen && mem1_csr_addr == 'h300) begin
       mstatus[3] <= wdata[3];
       mstatus[7] <= wdata[7];
-    end else if(exc)
+    end else if(wb_exc)
       if(~eret) begin
         mstatus[3] <= 0;
         mstatus[7] <= mstatus[3];
@@ -117,7 +116,7 @@ module csr(
       mepc <= '0;
     else if(wen && mem1_csr_addr == 'h341)
       mepc <= wdata[31:2];
-    else if(exc & ~eret)
+    else if(wb_exc & ~eret)
       mepc <= wb_pc;
 
   logic [31:0] mcause;
@@ -132,7 +131,7 @@ module csr(
         mcause[4:0] <= wdata[4:0];
       else
         mcause[3:0] <= wdata[3:0];
-    end else if(exc & ~eret) begin
+    end else if(wb_exc & ~eret) begin
       mcause <= '0;
       mcause[3:0] <= wb_exc_cause;
     end
@@ -158,12 +157,12 @@ module csr(
       mtval <= '0;
     else if(wen && mem1_csr_addr == 'h343)
       mtval <= wdata;
-    else if(exc & ~eret)
+    else if(wb_exc & ~eret)
       mtval <= exc_tval;
 
   always_comb begin
     csr_kill = wb_exc | (wb_valid & wb_flush);
-    csr_fe_inhibit = (wb_valid & wb_flush) | wb_stall;
+    csr_fe_inhibit = wb_stall;
     csr_setpc = wb_exc | wb_stall;
     if(wb_exc)
       csr_newpc = ~eret ? mtvec[31:2] : mepc;

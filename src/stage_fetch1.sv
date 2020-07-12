@@ -10,6 +10,7 @@ module stage_fetch1(
   input logic          fe0_valid,
   output logic         fe1_stall,
 
+  input logic          fe0_speculative,
   input logic [31:2]   fe0_read_addr,
 
   // icache inputs
@@ -53,13 +54,16 @@ module stage_fetch1(
   // execute inputs
   input logic          ex_valid,
 
+  input logic          ex_br_miss_nt,
+  input logic          ex_br_taken,
+
   // memory0 inputs/outputs
   input logic          mem0_valid,
 
   output logic         fe1_mem0_read,
   output logic [28:2]  fe1_mem0_addr,
 
-  // memory1 inputs
+  // memory1 inputs/outputs
   input logic          mem1_valid_fe1,
   input logic          mem1_stall,
   input logic          mem1_exc,
@@ -67,13 +71,12 @@ module stage_fetch1(
 
   input logic [31:0]   mem1_dout,
 
+  output logic         fe1_mem1_kill,
+
   // csr inputs
   input logic          csr_kill,
 
   input logic [31:0]   csr_satp,
-
-  // write outputs
-  output logic         fe1_busy,
 
   // bus inputs/outputs
   output logic         fe1_cvalid,
@@ -90,13 +93,31 @@ module stage_fetch1(
   output logic         fe1_eack
   );
 
+  logic kill;
+  assign kill = csr_kill | (speculative ? ex_br_miss_nt : ex_br_taken);
+  assign fe1_mem1_kill = kill;
+
+  logic busy, killed;
   always_ff @(posedge clk_core)
     if(~reset_n)
-      fe1_valid <= 0;
-    else if(~fe1_stall) begin
-      fe1_valid <= fe0_valid;
+      killed <= 0;
+    else if(kill & busy)
+      killed <= 1;
+    else if(~busy)
+      killed <= 0;
+
+  logic valid, speculative;
+  always_ff @(posedge clk_core)
+    if(~reset_n)
+      valid <= 0;
+    else if(~fe1_stall | ((kill | killed) & ~busy)) begin
+      valid <= fe0_valid;
+      speculative <= fe0_speculative;
       fe1_pc <= fe0_read_addr;
     end
+
+  assign fe1_valid = valid & ~fe1_stall & ~exc & ~(kill | killed);
+  assign fe1_exc = exc & ~(kill | killed);
 
   // tlb state machine
   struct packed {
@@ -106,7 +127,7 @@ module stage_fetch1(
   always_ff @(posedge clk_core)
     if(~reset_n)
       tlb_state <= '{idle:1,default:0};
-    else if(csr_kill)
+    else if(kill)
       tlb_state <= '{idle:1,default:0};
     else
       tlb_state <= tlb_state_next;
@@ -148,7 +169,7 @@ module stage_fetch1(
     unique case(1)
       tlb_state.idle:
         // tlb miss?
-        if(fe1_valid & satp_mode & ~ic_tlb_read_hit) begin
+        if(valid & ~kill & satp_mode & ~ic_tlb_read_hit) begin
           // read first-level PTE
           fe1_mem0_read = 1;
           fe1_mem0_addr = {satp_ppn,fe1_pc[31:22]};
@@ -203,6 +224,8 @@ module stage_fetch1(
   end
 
   // cam state machine
+  logic cam_exc;
+  assign cam_exc = bmain_error_fe1;
   assign fe1_eack = bmain_error_fe1;
 
   logic bus_stall_cmd, bus_stall_rdata, bus_stall;
@@ -220,7 +243,7 @@ module stage_fetch1(
   always_ff @(posedge clk_core)
     if(~reset_n)
       cam_state <= '{idle:1,default:0};
-    else if(bmain_error_fe1)
+    else if(cam_exc)
       cam_state <= '{idle:1,default:0};
     else if(~bus_stall)
       cam_state <= cam_state_next;
@@ -254,11 +277,9 @@ module stage_fetch1(
   logic fe1_insn_sel;
   assign fe1_insn = fe1_insn_sel ? cam_insn : ic_cam_read_data;
 
-  logic cam_exc;
   always_comb begin
     // set default values of outputs
     cam_state_next = cam_state;
-    cam_exc = 0;
 
     fe1_cam_write_req_data = 0;
     fe1_cam_write_req_tag_flags = 0;
@@ -272,7 +293,7 @@ module stage_fetch1(
     unique case(1)
       cam_state.idle:
         // tlb hit, cam miss?
-        if(fe1_valid & ~csr_kill & (~satp_mode | ic_tlb_read_hit) & ~ic_cam_read_hit) begin
+        if(valid & ~kill & (~satp_mode | ic_tlb_read_hit) & ~ic_cam_read_hit) begin
           // initiate bus read
           fe1_cvalid = 1;
           cam_state_next = '{fill0:1,default:0};
@@ -309,8 +330,9 @@ module stage_fetch1(
     endcase
   end
 
-  assign fe1_busy = fe1_valid & cam_stall;
-  assign fe1_stall = (fe1_valid & (tlb_stall | cam_stall | de_stall)) | (fe1_exc & de_stall);
-  assign fe1_exc = tlb_exc | cam_exc | bmain_error_fe1;
+  logic exc;
+  assign busy = cam_stall;
+  assign fe1_stall = (valid & (tlb_stall | cam_stall | de_stall)) | (exc & de_stall);
+  assign exc = tlb_exc | cam_exc;
 
 endmodule
