@@ -25,6 +25,10 @@ module stage_fetch1(
   input logic [1:0]    ic_cam_read_flags,
 
   // icache outputs
+  output logic         fe1_tlb_read_req,
+  output logic [8:0]   fe1_tlb_read_asid,
+  output logic [31:12] fe1_tlb_read_addr,
+
   output logic         fe1_tlb_write_req,
   output logic         fe1_tlb_write_super,
   output logic [31:21] fe1_tlb_write_tag,
@@ -121,7 +125,7 @@ module stage_fetch1(
 
   // tlb state machine
   struct packed {
-    logic idle, fill0, fill1;
+    logic idle, fill0, fill1, fill2, fill3;
   } tlb_state, tlb_state_next;
 
   always_ff @(posedge clk_core)
@@ -129,7 +133,7 @@ module stage_fetch1(
       tlb_state <= '{idle:1,default:0};
     else if(kill)
       tlb_state <= '{idle:1,default:0};
-    else
+    else if(~fe1_mem0_read | ~mem1_stall)
       tlb_state <= tlb_state_next;
 
   logic tlb_stall;
@@ -151,11 +155,16 @@ module stage_fetch1(
   assign pte_valid = pte.flags.v & (pte.flags.r | ~pte.flags.w);
   assign pte_leaf = pte.flags.r | pte.flags.w | pte.flags.x;
 
+  assign fe1_tlb_read_asid = satp_asid;
+  assign fe1_tlb_read_addr = fe1_pc[31:12];
+
   logic tlb_exc;
   always_comb begin
     // set default values of outputs
     tlb_state_next = tlb_state;
     tlb_exc = 0;
+
+    fe1_tlb_read_req = 0;
 
     fe1_tlb_write_req = 0;
     fe1_tlb_write_super = 0;
@@ -169,7 +178,7 @@ module stage_fetch1(
     unique case(1)
       tlb_state.idle:
         // tlb miss?
-        if(valid & ~kill & satp_mode & ~ic_tlb_read_hit) begin
+        if(valid & ~(kill | killed) & satp_mode & ~ic_tlb_read_hit) begin
           // read first-level PTE
           fe1_mem0_read = 1;
           fe1_mem0_addr = {satp_ppn,fe1_pc[31:22]};
@@ -177,7 +186,7 @@ module stage_fetch1(
         end
 
       tlb_state.fill0:
-        if(~mem1_valid_fe1 | mem1_stall)
+        if(~mem1_valid_fe1)
           // wait for request to complete
           ;
         else if(mem1_exc | ~pte_valid) begin
@@ -186,7 +195,7 @@ module stage_fetch1(
           tlb_state_next = '{idle:1,default:0};
         end else if(~pte_leaf) begin
           // read second-level PTE
-          fe1_mem0_read = 1;
+          fe1_mem0_read = ~kill;
           fe1_mem0_addr = {pte.ppn,fe1_pc[21:12]};
           tlb_state_next = '{fill1:1,default:0};
         end else if(|pte.ppn[9:0]) begin
@@ -200,14 +209,14 @@ module stage_fetch1(
           fe1_tlb_write_ppn = pte.ppn;
           fe1_tlb_write_flags = pte.flags;
 
-          tlb_state_next = '{idle:1,default:0};
+          tlb_state_next = '{fill2:1,default:0};
         end
 
       tlb_state.fill1:
-        if(~mem1_valid_fe1 | mem1_stall)
+        if(~mem1_valid_fe1)
           // wait for request to complete
           ;
-        else if(mem1_exc | ~pte_valid | pte_leaf) begin
+        else if(mem1_exc | ~pte_valid | ~pte_leaf) begin
           // raise exception (access fault/invalid PTE)
           tlb_exc = 1;
           tlb_state_next = '{idle:1,default:0};
@@ -218,8 +227,18 @@ module stage_fetch1(
           fe1_tlb_write_ppn = pte.ppn;
           fe1_tlb_write_flags = pte.flags;
 
-          tlb_state_next = '{idle:1,default:0};
+          tlb_state_next = '{fill2:1,default:0};
         end
+
+      tlb_state.fill2: begin
+        // redo the initial access
+        fe1_tlb_read_req = 1;
+
+        tlb_state_next = '{fill3:1,default:0};
+      end
+
+      tlb_state.fill3:
+        tlb_state_next = '{idle:1,default:0};
     endcase
   end
 
@@ -304,7 +323,7 @@ module stage_fetch1(
         fe1_rready = 1;
 
         // write word to cache
-        fe1_cam_write_req_data = 1;
+        fe1_cam_write_req_data = bmain_rvalid_fe1;
 
         // is this the desired word?
         if(cam_line_offset == fe1_pc[3:2])

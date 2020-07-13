@@ -138,7 +138,6 @@ module top(
   logic [4:0]           de_wb_reg;
   logic                 ex_br_miss;
   logic                 ex_br_miss_nt;
-  logic                 ex_br_pred;
   logic                 ex_br_taken;
   logic [31:0]          ex_data0;
   logic [31:0]          ex_data1;
@@ -177,6 +176,9 @@ module top(
   logic [31:2]          fe1_pc;
   logic                 fe1_rready;
   logic                 fe1_stall;
+  logic [31:12]         fe1_tlb_read_addr;
+  logic [8:0]           fe1_tlb_read_asid;
+  logic                 fe1_tlb_read_req;
   logic [8:0]           fe1_tlb_write_asid;
   logic [7:0]           fe1_tlb_write_flags;
   logic [28:12]         fe1_tlb_write_ppn;
@@ -237,8 +239,9 @@ module top(
   ecause_t              mem1_exc_cause;
   logic                 mem1_flush;
   logic [31:0]          mem1_fwd_data;
-  logic [28:2]          mem1_mem0_addr;
+  logic [31:2]          mem1_mem0_addr;
   logic                 mem1_mem0_read;
+  logic                 mem1_mem0_trans;
   logic [31:2]          mem1_pc;
   logic                 mem1_read;
   logic                 mem1_rready;
@@ -329,6 +332,9 @@ module top(
     (/*AUTOINST*/
      // Outputs
      .fe1_stall,
+     .fe1_tlb_read_req,
+     .fe1_tlb_read_asid (fe1_tlb_read_asid[8:0]),
+     .fe1_tlb_read_addr (fe1_tlb_read_addr[31:12]),
      .fe1_tlb_write_req,
      .fe1_tlb_write_super,
      .fe1_tlb_write_tag (fe1_tlb_write_tag[31:21]),
@@ -428,7 +434,6 @@ module top(
      .fe1_insn          (fe1_insn[31:0]),
      .ex_stall,
      .ex_valid,
-     .ex_br_pred,
      .ex_br_miss,
      .ex_br_taken,
      .ex_fwd_data       (ex_fwd_data[31:0]),
@@ -448,7 +453,6 @@ module top(
      .ex_br_miss_nt,
      .ex_br_taken,
      .ex_stall,
-     .ex_br_pred,
      .ex_br_miss,
      .ex_valid,
      .ex_exc,
@@ -536,14 +540,16 @@ module top(
      .csr_satp          (csr_satp[31:0]),
      .mem1_stall,
      .mem1_mem0_read,
-     .mem1_mem0_addr    (mem1_mem0_addr[28:2]));
+     .mem1_mem0_trans,
+     .mem1_mem0_addr    (mem1_mem0_addr[31:2]));
 
   stage_memory1 memory1
     (/*AUTOINST*/
      // Outputs
      .mem1_stall,
      .mem1_mem0_read,
-     .mem1_mem0_addr    (mem1_mem0_addr[28:2]),
+     .mem1_mem0_trans,
+     .mem1_mem0_addr    (mem1_mem0_addr[31:2]),
      .mem1_fwd_data     (mem1_fwd_data[31:0]),
      .mem1_tlb_write_req,
      .mem1_tlb_write_super,
@@ -707,6 +713,9 @@ module top(
      .fe0_read_req,
      .fe0_read_asid     (fe0_read_asid[8:0]),
      .fe0_read_addr     (fe0_read_addr[31:2]),
+     .fe1_tlb_read_req,
+     .fe1_tlb_read_asid (fe1_tlb_read_asid[8:0]),
+     .fe1_tlb_read_addr (fe1_tlb_read_addr[31:12]),
      .fe1_tlb_write_req,
      .fe1_tlb_write_super,
      .fe1_tlb_write_tag (fe1_tlb_write_tag[31:21]),

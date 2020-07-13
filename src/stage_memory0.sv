@@ -62,7 +62,8 @@ module stage_memory0(
   output logic [4:0]  mem0_wb_reg,
 
   input logic         mem1_mem0_read,
-  input logic [28:2]  mem1_mem0_addr
+  input logic         mem1_mem0_trans,
+  input logic [31:2]  mem1_mem0_addr
   );
 
   logic         satp_mode;
@@ -75,6 +76,7 @@ module stage_memory0(
   assign mem0_dc_asid = satp_asid;
 
   logic valid, exc;
+  logic [31:0] ex_data0_r;
   always_ff @(posedge clk_core)
     if(~reset_n) begin
       valid <= 0;
@@ -89,38 +91,42 @@ module stage_memory0(
       mem0_write <= ex_mem_write;
       mem0_extend <= ex_mem_extend;
       mem0_width <= ex_mem_width;
-      mem0_addr <= ex_data0;
+      ex_data0_r <= ex_data0;
       mem0_wdata <= ex_data1;
 
       mem0_wb_reg <= ex_wb_reg;
     end
 
-  assign mem0_valid = valid & ~mem0_stall & ~exc & ~csr_kill;
-  assign mem0_exc = exc & ~csr_kill;
+  assign mem0_valid = ((valid & ~mem0_stall & ~exc) | fe1_mem0_read) & ~csr_kill;
+  assign mem0_exc = exc & ~fe1_mem0_read & ~csr_kill;
 
   assign mem0_mem1_req = mem1_mem0_read; 
   assign mem0_fe1_req = fe1_mem0_read;
 
-  assign mem0_fwd_data = mem0_addr;
+  assign mem0_fwd_data = ex_data0_r;
 
   always_comb begin
     mem0_dc_read = 0;
     mem0_dc_trans = 0;
     mem0_dc_addr = '0;
+    mem0_addr = ex_data0_r;
 
     if(mem1_mem0_read) begin
       mem0_dc_read = 1;
-      mem0_dc_addr = {3'b0,mem1_mem0_addr};
+      mem0_dc_trans = mem1_mem0_trans;
+      mem0_dc_addr = mem1_mem0_addr;
+      mem0_addr = {mem0_dc_addr,2'b0};
     end else if(fe1_mem0_read) begin
       mem0_dc_read = 1;
       mem0_dc_addr = {3'b0,fe1_mem0_addr};
-    end else if(mem0_valid) begin
+      mem0_addr = {mem0_dc_addr,2'b0};
+    end else if(valid) begin
       mem0_dc_read = ~mem0_stall;
       mem0_dc_trans = 1;
-      mem0_dc_addr = mem0_addr;
+      mem0_dc_addr = ex_data0_r[31:2];
     end
   end
 
-  assign mem0_stall = (valid | exc) & mem1_stall;
+  assign mem0_stall = (valid | exc) & (mem1_stall | fe1_mem0_read);
 
 endmodule

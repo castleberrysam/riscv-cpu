@@ -53,7 +53,6 @@ module stage_decode(
   output logic [4:0]  de_wb_reg,
 
   input logic         ex_valid,
-  input logic         ex_br_pred,
   input logic         ex_br_miss,
   input logic         ex_br_taken,
 
@@ -231,7 +230,7 @@ module stage_decode(
 
   logic [31:0] br_miss_pc;
   always_comb
-    br_miss_pc = {de_pc,2'b0} + (br_take ? 4 : imm);
+    br_miss_pc = {de_pc,2'b0} + (br_take ? 8 : imm);
 
   logic [31:2] br_miss_pc_r;
   always_ff @(posedge clk_core)
@@ -239,11 +238,11 @@ module stage_decode(
 
   logic [31:0] newpc;
   always_comb
-    if(ex_br_miss) begin
+    if(ex_br_miss & (ex_br_taken | ~valid | ~transfer | ~(de_jump | br_take))) begin
       de_setpc = 1;
       de_speculative = 0;
       newpc = {br_miss_pc_r,2'b0};
-    end else if(valid & transfer & (de_jump | br_take) & (~ex_valid | ~ex_br_pred)) begin
+    end else if(valid & transfer & (de_jump | br_take) & ~ex_br_taken) begin
       de_setpc = 1;
       de_speculative = 1;
       if(jalr)

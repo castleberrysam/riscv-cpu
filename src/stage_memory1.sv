@@ -27,7 +27,8 @@ module stage_memory1(
   input logic [4:0]    mem0_wb_reg,
 
   output logic         mem1_mem0_read,
-  output logic [28:2]  mem1_mem0_addr,
+  output logic         mem1_mem0_trans,
+  output logic [31:2]  mem1_mem0_addr,
 
   // decode outputs
   output logic [31:0]  mem1_fwd_data,
@@ -148,12 +149,13 @@ module stage_memory1(
       mem0_exc_r <= 0;
     end else begin
       mem1_mem1_req <= mem0_mem1_req;
-      mem1_fe1_req <= mem0_fe1_req;
       if(~mem1_stall | ((kill | killed) & ~busy)) begin
         valid <= mem0_valid;
         mem0_exc_r <= mem0_exc;
         mem0_exc_cause_r <= mem0_exc_cause;
         mem1_pc <= mem0_pc;
+
+        mem1_fe1_req <= mem0_fe1_req;
 
         mem1_read <= mem0_read;
         mem1_write <= mem0_write;
@@ -175,8 +177,8 @@ module stage_memory1(
   assign mem1_fwd_data = mem1_addr;
 
   logic dc_access, csr_access;
-  assign dc_access = valid & (mem1_read ^ mem1_write);
-  assign csr_access = valid & mem1_read & mem1_write;
+  assign dc_access = valid & ((mem1_read ^ mem1_write) | tlb_fill_req);
+  assign csr_access = valid & mem1_read & mem1_write & ~tlb_fill_req;
 
   assign mem1_csr_addr = mem1_addr[11:0];
   assign mem1_csr_write = csr_access ? mem1_width : '0;
@@ -201,7 +203,7 @@ module stage_memory1(
 
   // tlb state machine
   struct packed {
-    logic idle, fill0, fill1;
+    logic idle, fill0, fill1, fill2, fill3;
   } tlb_state, tlb_state_next;
 
   always_ff @(posedge clk_core)
@@ -259,23 +261,24 @@ module stage_memory1(
     tlb_cam_addr = '0;
 
     mem1_mem0_read = 0;
+    mem1_mem0_trans = 0;
     mem1_mem0_addr = '0;
 
     unique case(1)
       tlb_state.idle:
-        if(dc_access & ~kill & virt)
+        if(dc_access & ~(kill | killed) & virt)
           // tlb miss or stale dirty bit?
           if(~dc_tlb_read_hit | tlb_set_dirty) begin
             // read first-level PTE
             mem1_mem0_read = 1;
-            mem1_mem0_addr = {satp_ppn,mem1_addr[31:22]};
+            mem1_mem0_addr = {3'b0,satp_ppn,mem1_addr[31:22]};
             tlb_state_next = '{fill0:1,default:0};
           end
 
       tlb_state.fill0:
         if(cam_stall)
           // wait for request to complete
-          mem1_mem0_addr = {satp_ppn,mem1_addr[31:22]};          
+          mem1_mem0_addr = {3'b0,satp_ppn,mem1_addr[31:22]};
         else if(cam_exc | ~pte_valid) begin
           // raise exception (access fault/invalid PTE)
           tlb_exc = 1;
@@ -283,7 +286,7 @@ module stage_memory1(
         end else if(~pte_leaf) begin
           // read second-level PTE
           mem1_mem0_read = 1;
-          mem1_mem0_addr = {pte.ppn,mem1_addr[21:12]};
+          mem1_mem0_addr = {3'b0,pte.ppn,mem1_addr[21:12]};
           tlb_state_next = '{fill1:1,default:0};
         end else if(|pte.ppn[9:0]) begin
           // raise exception (misaligned superpage)
@@ -296,18 +299,14 @@ module stage_memory1(
           mem1_tlb_write_ppn = pte.ppn;
           mem1_tlb_write_flags = pte.flags;
 
-          // redo the initial access
-          mem1_mem0_read = 1;
-          mem1_mem0_addr = mem1_addr;
-
-          tlb_state_next = '{idle:1,default:0};
+          tlb_state_next = '{fill2:1,default:0};
         end
 
       tlb_state.fill1:
         if(cam_stall)
           // wait for request to complete
-          mem1_mem0_addr = {pte.ppn,mem1_addr[21:12]};
-        else if(cam_exc | ~pte_valid | pte_leaf) begin
+          mem1_mem0_addr = {3'b0,pte.ppn,mem1_addr[21:12]};
+        else if(cam_exc | ~pte_valid | ~pte_leaf) begin
           // raise exception (access fault/invalid PTE)
           tlb_exc = 1;
           tlb_state_next = '{idle:1,default:0};
@@ -318,12 +317,20 @@ module stage_memory1(
           mem1_tlb_write_ppn = pte.ppn;
           mem1_tlb_write_flags = pte.flags;
 
-          // redo the initial access
-          mem1_mem0_read = 1;
-          mem1_mem0_addr = mem1_addr;
-
-          tlb_state_next = '{idle:1,default:0};
+          tlb_state_next = '{fill2:1,default:0};
         end
+
+      tlb_state.fill2: begin
+        // redo the initial access
+        mem1_mem0_read = 1;
+        mem1_mem0_trans = 1;
+        mem1_mem0_addr = mem1_addr[31:2];
+
+        tlb_state_next = '{fill3:1,default:0};
+      end
+
+      tlb_state.fill3:
+        tlb_state_next = '{idle:1,default:0};
     endcase
   end
 
@@ -343,7 +350,7 @@ module stage_memory1(
   assign bus_beat_rdata = mem1_rready & bmain_rvalid_mem1;
 
   struct packed {
-    logic idle, evict, fill0, fill1, fill2, fill3;
+    logic idle, evict, fill0, fill1, fill2, fill3, write;
   } cam_state, cam_state_next;
 
   always_ff @(posedge clk_core)
@@ -400,21 +407,30 @@ module stage_memory1(
   always_comb begin
     cam_dout_raw = cam_dout_sel ? cam_rword : dc_cam_read_data;
 
-    unique casez(mem1_width)
-      'b00: begin
-        cam_dout[7:0] = cam_dout_raw[mem1_addr[1:0]*8+:8];
-        cam_dout[31:8] = mem1_extend ? cam_dout[7] : '0;
-      end
-
-      'b01: begin
-        cam_dout[15:0] = cam_dout_raw[mem1_addr[1]*16+:16];
-        cam_dout[31:16] = mem1_extend ? cam_dout[15] : '0;
-      end
-
-      'b1?:
+    if(tlb_fill_req) begin
+      if(pte_leaf)
+        cam_dout = cam_dout_raw | {24'b0,mem1_mem1_req & mem1_write,1'b1,6'b0};
+      else
         cam_dout = cam_dout_raw;
-    endcase
+    end else
+      unique casez(mem1_width)
+        'b00: begin
+          cam_dout[7:0] = cam_dout_raw[mem1_addr[1:0]*8+:8];
+          cam_dout[31:8] = mem1_extend ? cam_dout[7] : '0;
+        end
+
+        'b01: begin
+          cam_dout[15:0] = cam_dout_raw[mem1_addr[1]*16+:16];
+          cam_dout[31:16] = mem1_extend ? cam_dout[15] : '0;
+        end
+
+        'b1?:
+          cam_dout = cam_dout_raw;
+      endcase
   end
+
+  logic [31:0] cam_addr;
+  assign cam_addr = mem1_mem1_req ? mem1_mem0_addr : mem1_addr;
 
   assign mem1_bus_wdata = dc_cam_read_data;
   assign mem1_wmask = '1;
@@ -458,7 +474,7 @@ module stage_memory1(
               // initiate bus write
               mem1_cvalid = 1;
               mem1_cmd = 0;
-              mem1_bus_addr = {dc_cam_read_tag_out,mem1_addr[11:2]};
+              mem1_bus_addr = {dc_cam_read_tag_out,cam_addr[11:2]};
 
               mem1_wvalid = 1;
               mem1_wlast = 0;
@@ -471,22 +487,28 @@ module stage_memory1(
               // initiate bus read
               mem1_cvalid = 1;
               mem1_cmd = 1;
-              mem1_bus_addr = {mem1_cam_read_tag_in,mem1_addr[11:2]};
+              mem1_bus_addr = {mem1_cam_read_tag_in,cam_addr[11:2]};
 
               cam_state_next = '{fill1:1,default:0};
             end
-          end else if(tlb_fill_req & pte_leaf) begin
-            // update accessed/dirty bits
-            mem1_cam_write_index = mem1_mem0_addr[11:2];
-            mem1_cam_write_req_data = 1;
-            mem1_cam_write_data = {24'b0,cam_dout_raw[7:0] | {mem1_write,1'b1,6'b0}};
-            mem1_cam_write_mask = 'b0001;
+          end else if(tlb_fill_req) begin
+            if(pte_leaf) begin
+              // update accessed/dirty bits
+              mem1_cam_write_index = cam_addr[11:2];
+              mem1_cam_write_req_data = 1;
+              mem1_cam_write_data = cam_dout;
+              mem1_cam_write_mask = '1;
+
+              cam_state_next = '{write:1,default:0};
+            end
           end else if(mem1_write) begin
             // write data to cache
-            mem1_cam_write_index = mem1_addr[11:2];
+            mem1_cam_write_index = cam_addr[11:2];
             mem1_cam_write_req_data = 1;
             mem1_cam_write_data = cam_wdata;
             mem1_cam_write_mask = cam_wmask;
+
+            cam_state_next = '{write:1,default:0};
           end
       end
 
@@ -512,7 +534,7 @@ module stage_memory1(
         // initiate bus read
         mem1_cvalid = 1;
         mem1_cmd = 1;
-        mem1_bus_addr = {mem1_cam_read_tag_in,mem1_addr[11:2]};
+        mem1_bus_addr = {mem1_cam_read_tag_in,cam_addr[11:2]};
 
         cam_state_next = '{fill1:1,default:0};
       end
@@ -522,20 +544,20 @@ module stage_memory1(
         mem1_rready = 1;
 
         // write word to cache
-        mem1_cam_write_index = {mem1_addr[11:4],cam_line_offset};
-        mem1_cam_write_req_data = 1;
+        mem1_cam_write_index = {cam_addr[11:4],cam_line_offset};
+        mem1_cam_write_req_data = bmain_rvalid_mem1;
         mem1_cam_write_data = bmain_rdata;
         mem1_cam_write_mask = '1;
 
         // is this the desired word?
-        if(cam_line_offset == mem1_addr[3:2])
+        if(cam_line_offset == cam_addr[3:2])
           // capture read data
           cam_rword_wen = 1;
 
         // last word?
         if(bmain_rlast) begin
           // mark line valid
-          mem1_cam_write_req_tag_flags = 1;
+          mem1_cam_write_req_tag_flags = bmain_rvalid_mem1;
           mem1_cam_write_flags = 'b01;
 
           cam_state_next = '{fill2:1,default:0};
@@ -545,15 +567,17 @@ module stage_memory1(
       cam_state.fill2: begin
         // commit write data
         cam_dout_sel = 1;
-        if(tlb_fill_req & pte_leaf) begin
-          // update accessed/dirty bits
-          mem1_cam_write_index = mem1_mem0_addr[11:2];
-          mem1_cam_write_req_data = 1;
-          mem1_cam_write_data = {24'b0,cam_dout_raw[7:0] | {mem1_write,1'b1,6'b0}};
-          mem1_cam_write_mask = 'b0001;
+        if(tlb_fill_req) begin
+          if(pte_leaf) begin
+            // update accessed/dirty bits
+            mem1_cam_write_index = mem1_mem0_addr[11:2];
+            mem1_cam_write_req_data = 1;
+            mem1_cam_write_data = cam_dout;
+            mem1_cam_write_mask = 'b0001;
+          end
         end else if(mem1_write) begin
           // write data to cache
-          mem1_cam_write_index = mem1_addr[11:2];
+          mem1_cam_write_index = cam_addr[11:2];
           mem1_cam_write_req_data = 1;
           mem1_cam_write_data = cam_wdata;
           mem1_cam_write_mask = cam_wmask;
@@ -568,6 +592,9 @@ module stage_memory1(
 
         cam_state_next = '{idle:1,default:0};
       end
+
+      cam_state.write:
+        cam_state_next = '{idle:1,default:0};
     endcase
   end
 
@@ -579,6 +606,6 @@ module stage_memory1(
     endcase
 
   assign busy = cam_stall;
-  assign mem1_stall = (valid & (tlb_stall | cam_stall | wb_stall)) | (exc & wb_stall);
+  assign mem1_stall = (valid & (tlb_stall | cam_stall | (~mem1_fe1_req & wb_stall))) | (exc & ~mem1_fe1_req & wb_stall);
 
 endmodule

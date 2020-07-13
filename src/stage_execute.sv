@@ -43,7 +43,6 @@ module stage_execute(
 
   input logic [4:0]   de_wb_reg,
 
-  output logic        ex_br_pred,
   output logic        ex_br_miss,
 
   // memory0 inputs/outputs
@@ -80,7 +79,7 @@ module stage_execute(
   logic [31:0] ex_rdata1, ex_rdata2, ex_imm;
   logic        ex_use_pc, ex_use_imm, ex_sub_sra, ex_data1_sel;
   aluop_t      ex_op;
-  logic        ex_br, ex_br_inv, ex_jump;
+  logic        ex_br, ex_br_inv, ex_br_pred, ex_jump;
   logic        ex_br_misalign, ex_br_miss_misalign;
   always_ff @(posedge clk_core)
     if(~reset_n) begin

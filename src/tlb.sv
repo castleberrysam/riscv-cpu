@@ -32,8 +32,10 @@ module tlb(
   logic [31:12] read_addr_r;
   always_ff @(posedge clk) begin
     read_req_r <= read_req;
-    read_asid_r <= read_asid;
-    read_addr_r <= read_addr;
+    if(read_req) begin
+      read_asid_r <= read_asid;
+      read_addr_r <= read_addr;
+    end
   end
 
   // 4MiB data+tag store
@@ -136,8 +138,10 @@ module tlb(
   initial begin
     for(int i=0;i<1024;i++)
       super_mem[i] = '0;
-    for(int i=0;i<512;i++)
+    for(int i=0;i<512;i++) begin
       data_mem[i] = '0;
+      lru_mem[i] = '0;
+    end
   end
 
 endmodule

@@ -12,6 +12,10 @@ module icache(
   input logic [31:2]   fe0_read_addr,
 
   // inputs from fetch1
+  input logic          fe1_tlb_read_req,
+  input logic [8:0]    fe1_tlb_read_asid,
+  input logic [31:12]  fe1_tlb_read_addr,
+
   input logic          fe1_tlb_write_req,
   input logic          fe1_tlb_write_super,
   input logic [31:21]  fe1_tlb_write_tag,
@@ -47,9 +51,9 @@ module icache(
     .reset_n(reset_n),
 
     // read inputs
-    .read_req(fe0_read_req),
-    .read_asid(fe0_read_asid),
-    .read_addr(fe0_read_addr[31:12]),
+    .read_req(fe0_read_req | fe1_tlb_read_req),
+    .read_asid(fe0_read_req ? fe0_read_asid : fe1_tlb_read_asid),
+    .read_addr(fe0_read_req ? fe0_read_addr[31:12] : fe1_tlb_read_addr),
 
     // read outputs
     .read_hit(ic_tlb_read_hit),
