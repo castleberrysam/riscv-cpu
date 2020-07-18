@@ -8,7 +8,7 @@ module stage_decode(
 
   // fetch0 outputs
   output logic        de_setpc,
-  output logic        de_speculative,
+  output logic        de_setspecid,
   output logic [31:2] de_newpc,
   
   // fetch1 inputs/outputs
@@ -18,6 +18,7 @@ module stage_decode(
   input logic         fe1_exc,
   input logic [31:2]  fe1_pc,
 
+  input logic         fe1_specid,
   input logic [31:0]  fe1_insn,
 
   // execute inputs/outputs
@@ -26,6 +27,8 @@ module stage_decode(
   output logic        de_exc,
   output ecause_t     de_exc_cause,
   output logic [31:2] de_pc,
+
+  output logic        de_specid,
 
   output logic [31:0] de_rdata1,
   output logic [31:0] de_rdata2,
@@ -52,9 +55,10 @@ module stage_decode(
 
   output logic [4:0]  de_wb_reg,
 
-  input logic         ex_valid,
+  input logic         ex_specid,
   input logic         ex_br_miss,
   input logic         ex_br_taken,
+  input logic         ex_br_ntaken,
 
   input logic [31:0]  ex_fwd_data,
 
@@ -82,7 +86,7 @@ module stage_decode(
   );
 
   logic kill;
-  assign kill = csr_kill | ex_br_taken;
+  assign kill = csr_kill | ((de_specid ^ ex_specid) ? ex_br_ntaken : ex_br_taken);
 
   logic        valid;
   logic        fe1_exc_r;
@@ -96,6 +100,7 @@ module stage_decode(
       fe1_exc_r <= fe1_exc;
       de_pc <= fe1_pc;
 
+      de_specid <= fe1_specid;
       de_insn <= fe1_insn;
     end
 
@@ -234,24 +239,25 @@ module stage_decode(
 
   logic [31:2] br_miss_pc_r;
   always_ff @(posedge clk_core)
-    br_miss_pc_r <= br_miss_pc[31:2];
+    if(de_br)
+      br_miss_pc_r <= br_miss_pc[31:2];
 
   logic [31:0] newpc;
   always_comb
     if(ex_br_miss & (ex_br_taken | ~valid | ~transfer | ~(de_jump | br_take))) begin
       de_setpc = 1;
-      de_speculative = 0;
+      de_setspecid = 1;
       newpc = {br_miss_pc_r,2'b0};
-    end else if(valid & transfer & (de_jump | br_take) & ~ex_br_taken) begin
+    end else if(valid & ~de_stall & transfer & (de_jump | br_take) & ~ex_br_taken) begin
       de_setpc = 1;
-      de_speculative = 1;
+      de_setspecid = ~ex_br_miss;
       if(jalr)
         newpc = (rdata1 + imm) & ~1;
       else
         newpc = {de_pc,2'b0} + imm;
     end else begin
       de_setpc = 0;
-      de_speculative = 0;
+      de_setspecid = 0;
       newpc = '0;
     end
 

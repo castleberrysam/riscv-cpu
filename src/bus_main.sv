@@ -204,11 +204,14 @@ module bus_main(
     if(~reset_n)
       wdata_valid <= 0;
     else if(wdata_beat_in) begin
+      wdata_valid <= 1;
       wlast <= mem1_wlast;
       wdata <= mem1_bus_wdata;
       wmask <= mem1_wmask;
-    end else if(wdata_beat_out)
+    end else if(wdata_beat_out) begin
       wdata_valid <= 0;
+      wlast <= 0;
+    end
 
   assign bmain_wready_mem1 = ~wdata_valid | (wdata_beat_out & ~wlast);
   assign bmain_wvalid_flash = sel.flash & ~cmd & wdata_valid;

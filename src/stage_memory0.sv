@@ -29,6 +29,8 @@ module stage_memory0(
   input logic [28:2]  fe1_mem0_addr,
 
   // decode outputs
+  output logic        mem0_fwd_valid,
+  output logic        mem0_fwd_stall,
   output logic [31:0] mem0_fwd_data,
 
   // dcache outputs
@@ -103,6 +105,8 @@ module stage_memory0(
   assign mem0_mem1_req = mem1_mem0_read; 
   assign mem0_fe1_req = fe1_mem0_read;
 
+  assign mem0_fwd_valid = valid;
+  assign mem0_fwd_stall = mem0_read;
   assign mem0_fwd_data = ex_data0_r;
 
   always_comb begin
@@ -121,7 +125,7 @@ module stage_memory0(
       mem0_dc_addr = {3'b0,fe1_mem0_addr};
       mem0_addr = {mem0_dc_addr,2'b0};
     end else if(valid) begin
-      mem0_dc_read = ~mem0_stall;
+      mem0_dc_read = ~mem0_stall & (mem0_read | mem0_write);
       mem0_dc_trans = 1;
       mem0_dc_addr = ex_data0_r[31:2];
     end

@@ -10,7 +10,7 @@ module stage_fetch0(
   output logic        fe0_valid,
   input logic         fe1_stall,
 
-  output logic        fe0_speculative,
+  output logic        fe0_specid,
 
   // icache outputs
   output logic        fe0_read_req,
@@ -19,7 +19,7 @@ module stage_fetch0(
 
   // decode inputs
   input logic         de_setpc,
-  input logic         de_speculative,
+  input logic         de_setspecid,
   input logic [31:2]  de_newpc,
 
   // csr inputs
@@ -53,17 +53,13 @@ module stage_fetch0(
       fe0_read_addr = fe0_pc;
   end
 
-  logic speculative;
+  logic specid;
   always_ff @(posedge clk_core)
     if(~reset_n)
-      speculative <= 0;
-    else if(csr_setpc)
-      speculative <= 0;
-    else if(de_setpc & ~fe0_read_req)
-      speculative <= de_speculative;
-    else if(fe0_read_req)
-      speculative <= 0;
+      specid <= 0;
+    else if(de_setpc & de_setspecid)
+      specid <= ~specid;
 
-  assign fe0_speculative = speculative | (~csr_setpc & de_setpc & de_speculative);
+  assign fe0_specid = specid ^ (de_setpc & de_setspecid);
 
 endmodule

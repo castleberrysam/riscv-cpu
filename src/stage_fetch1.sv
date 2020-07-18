@@ -10,7 +10,7 @@ module stage_fetch1(
   input logic          fe0_valid,
   output logic         fe1_stall,
 
-  input logic          fe0_speculative,
+  input logic          fe0_specid,
   input logic [31:2]   fe0_read_addr,
 
   // icache inputs
@@ -53,13 +53,15 @@ module stage_fetch1(
   output logic         fe1_exc,
   output logic [31:2]  fe1_pc,
 
+  output logic         fe1_specid,
   output logic [31:0]  fe1_insn,
 
   // execute inputs
   input logic          ex_valid,
 
-  input logic          ex_br_miss_nt,
+  input logic          ex_specid,
   input logic          ex_br_taken,
+  input logic          ex_br_ntaken,
 
   // memory0 inputs/outputs
   input logic          mem0_valid,
@@ -98,7 +100,7 @@ module stage_fetch1(
   );
 
   logic kill;
-  assign kill = csr_kill | (speculative ? ex_br_miss_nt : ex_br_taken);
+  assign kill = csr_kill | ((fe1_specid ^ ex_specid) ? ex_br_ntaken : ex_br_taken);
   assign fe1_mem1_kill = kill;
 
   logic busy, killed;
@@ -110,13 +112,13 @@ module stage_fetch1(
     else if(~busy)
       killed <= 0;
 
-  logic valid, speculative;
+  logic valid;
   always_ff @(posedge clk_core)
     if(~reset_n)
       valid <= 0;
     else if(~fe1_stall | ((kill | killed) & ~busy)) begin
       valid <= fe0_valid;
-      speculative <= fe0_speculative;
+      fe1_specid <= fe0_specid;
       fe1_pc <= fe0_read_addr;
     end
 
@@ -286,7 +288,7 @@ module stage_fetch1(
       cam_insn <= bmain_rdata;
 
   assign fe1_cmd = 1;
-  assign fe1_addr = {fe1_cam_read_tag_in,fe1_pc[11:2]};
+  assign fe1_addr = {fe1_cam_read_tag_in,fe1_pc[11:4],2'b0};
 
   assign fe1_cam_write_index = {fe1_pc[11:4],cam_line_offset};
   assign fe1_cam_write_tag = fe1_cam_read_tag_in;

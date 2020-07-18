@@ -7,7 +7,8 @@ module stage_execute(
   input logic         reset_n,
 
   // fetch1 outputs
-  output logic        ex_br_miss_nt,
+  output logic        ex_specid,
+  output logic        ex_br_ntaken,
   output logic        ex_br_taken,
 
   // decode inputs/outputs
@@ -17,6 +18,8 @@ module stage_execute(
   input logic         de_exc,
   input ecause_t      de_exc_cause,
   input logic [31:2]  de_pc,
+
+  input logic         de_specid,
 
   input logic [31:0]  de_rdata1,
   input logic [31:0]  de_rdata2,
@@ -69,6 +72,8 @@ module stage_execute(
   input logic         wb_exc,
 
   // forward unit outputs
+  output logic        ex_fwd_valid,
+  output logic        ex_fwd_stall,
   output logic [31:0] ex_fwd_data
   );
 
@@ -90,6 +95,8 @@ module stage_execute(
       de_exc_r <= de_exc;
       de_exc_cause_r <= de_exc_cause;
       ex_pc <= de_pc;
+
+      ex_specid <= de_specid;
 
       ex_rdata1 <= de_rdata1;
       ex_rdata2 <= de_rdata2;
@@ -121,12 +128,12 @@ module stage_execute(
   assign ex_exc = exc & ~csr_kill;
 
   logic br_check, br_cond;
-  assign br_check = valid & ex_br;
+  assign br_check = valid & ~ex_stall & ex_br;
   assign br_cond = ex_br_inv ^ cmp_out;
 
   assign ex_br_miss = br_check & (ex_br_pred ^ br_cond);
-  assign ex_br_miss_nt = br_check & ex_br_pred & ~br_cond;
-  assign ex_br_taken = (valid & ex_jump) | (br_check & br_cond);
+  assign ex_br_ntaken = br_check & ~br_cond;
+  assign ex_br_taken = valid & ~ex_stall & (ex_jump | (ex_br & br_cond));
 
   logic [31:0] op1, op2;
   assign op1 = ex_use_pc ? {ex_pc,2'b0} : ex_rdata1;
@@ -182,6 +189,8 @@ module stage_execute(
       default: alu_out = '0;
     endcase
 
+  assign ex_fwd_valid = valid;
+  assign ex_fwd_stall = ex_mem_read | mul_stall;
   assign ex_fwd_data = alu_out;
 
   always_comb begin
@@ -204,7 +213,10 @@ module stage_execute(
     end
   end
 
-  assign ex_stall = (valid & (mem0_stall | (mul_go & ~mul_done))) | (exc & mem0_stall);
+  logic mul_stall;
+  assign mul_stall = mul_go & ~mul_done;
+
+  assign ex_stall = (valid & (mem0_stall | mul_stall)) | (exc & mem0_stall);
 
 `ifndef SYNTHESIS
   always_ff @(posedge clk_core)

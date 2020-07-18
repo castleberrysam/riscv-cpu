@@ -33,8 +33,12 @@ module cam(
   logic [1:0] read_way;
 
   logic        read_req_r;
-  always_ff @(posedge clk)
+  logic [11:2] read_index_r;
+  always_ff @(posedge clk) begin
     read_req_r <= read_req;
+    if(read_req)
+      read_index_r <= read_index;
+  end
 
   // silly hack needed since the vivado block ram inference is... less than ideal
   logic [7:0]  data_mem_wen;
@@ -82,7 +86,7 @@ module cam(
     if(read_req)
       lru <= lru_mem[read_index[11:4]];
     if(read_req_r & read_hit)
-      lru_mem[write_index[11:4]] <= read_way[0];
+      lru_mem[read_index_r[11:4]] <= read_way[0];
   end
 
   logic [1:0] hits;

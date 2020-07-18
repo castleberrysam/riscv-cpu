@@ -66,7 +66,7 @@ module csr(
   always_ff @(posedge clk_core)
     if(~reset_n)
       instret <= '0;
-    else if(wb_valid)
+    else if(wb_valid & ~wb_stall)
       instret <= instret + 1;
 
   logic eret;

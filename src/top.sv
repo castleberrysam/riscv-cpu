@@ -131,7 +131,8 @@ module top(
   logic [4:0]           de_rs1;
   logic [4:0]           de_rs2;
   logic                 de_setpc;
-  logic                 de_speculative;
+  logic                 de_setspecid;
+  logic                 de_specid;
   logic                 de_stall;
   logic                 de_sub_sra;
   logic                 de_use_imm;
@@ -139,25 +140,28 @@ module top(
   logic                 de_valid;
   logic [4:0]           de_wb_reg;
   logic                 ex_br_miss;
-  logic                 ex_br_miss_nt;
+  logic                 ex_br_ntaken;
   logic                 ex_br_taken;
   logic [31:0]          ex_data0;
   logic [31:0]          ex_data1;
   logic                 ex_exc;
   ecause_t              ex_exc_cause;
   logic [31:0]          ex_fwd_data;
+  logic                 ex_fwd_stall;
+  logic                 ex_fwd_valid;
   logic                 ex_mem_extend;
   logic                 ex_mem_read;
   logic [1:0]           ex_mem_width;
   logic                 ex_mem_write;
   logic [31:2]          ex_pc;
+  logic                 ex_specid;
   logic                 ex_stall;
   logic                 ex_valid;
   logic [4:0]           ex_wb_reg;
   logic [31:2]          fe0_read_addr;
   logic [8:0]           fe0_read_asid;
   logic                 fe0_read_req;
-  logic                 fe0_speculative;
+  logic                 fe0_specid;
   logic                 fe0_valid;
   logic [28:2]          fe1_addr;
   logic [28:12]         fe1_cam_read_tag_in;
@@ -177,6 +181,7 @@ module top(
   logic                 fe1_mem1_kill;
   logic [31:2]          fe1_pc;
   logic                 fe1_rready;
+  logic                 fe1_specid;
   logic                 fe1_stall;
   logic [31:12]         fe1_tlb_read_addr;
   logic [8:0]           fe1_tlb_read_asid;
@@ -209,6 +214,8 @@ module top(
   logic                 mem0_extend;
   logic                 mem0_fe1_req;
   logic [31:0]          mem0_fwd_data;
+  logic                 mem0_fwd_stall;
+  logic                 mem0_fwd_valid;
   logic                 mem0_mem1_req;
   logic [31:2]          mem0_pc;
   logic                 mem0_read;
@@ -241,6 +248,8 @@ module top(
   ecause_t              mem1_exc_cause;
   logic                 mem1_flush;
   logic [31:0]          mem1_fwd_data;
+  logic                 mem1_fwd_stall;
+  logic                 mem1_fwd_valid;
   logic [31:2]          mem1_mem0_addr;
   logic                 mem1_mem0_read;
   logic                 mem1_mem0_trans;
@@ -314,7 +323,7 @@ module top(
     (/*AUTOINST*/
      // Outputs
      .fe0_valid,
-     .fe0_speculative,
+     .fe0_specid,
      .fe0_read_req,
      .fe0_read_asid     (fe0_read_asid[8:0]),
      .fe0_read_addr     (fe0_read_addr[31:2]),
@@ -323,7 +332,7 @@ module top(
      .reset_n,
      .fe1_stall,
      .de_setpc,
-     .de_speculative,
+     .de_setspecid,
      .de_newpc          (de_newpc[31:2]),
      .csr_fe_inhibit,
      .csr_setpc,
@@ -353,6 +362,7 @@ module top(
      .fe1_valid,
      .fe1_exc,
      .fe1_pc            (fe1_pc[31:2]),
+     .fe1_specid,
      .fe1_insn          (fe1_insn[31:0]),
      .fe1_mem0_read,
      .fe1_mem0_addr     (fe1_mem0_addr[28:2]),
@@ -366,7 +376,7 @@ module top(
      .clk_core,
      .reset_n,
      .fe0_valid,
-     .fe0_speculative,
+     .fe0_specid,
      .fe0_read_addr     (fe0_read_addr[31:2]),
      .ic_tlb_read_hit,
      .ic_tlb_read_super,
@@ -378,8 +388,9 @@ module top(
      .ic_cam_read_flags (ic_cam_read_flags[1:0]),
      .de_stall,
      .ex_valid,
-     .ex_br_miss_nt,
+     .ex_specid,
      .ex_br_taken,
+     .ex_br_ntaken,
      .mem0_valid,
      .mem1_valid_fe1,
      .mem1_stall,
@@ -398,13 +409,14 @@ module top(
     (/*AUTOINST*/
      // Outputs
      .de_setpc,
-     .de_speculative,
+     .de_setspecid,
      .de_newpc          (de_newpc[31:2]),
      .de_stall,
      .de_valid,
      .de_exc,
      .de_exc_cause,
      .de_pc             (de_pc[31:2]),
+     .de_specid,
      .de_rdata1         (de_rdata1[31:0]),
      .de_rdata2         (de_rdata2[31:0]),
      .de_imm            (de_imm[31:0]),
@@ -433,11 +445,13 @@ module top(
      .fe1_stall,
      .fe1_exc,
      .fe1_pc            (fe1_pc[31:2]),
+     .fe1_specid,
      .fe1_insn          (fe1_insn[31:0]),
      .ex_stall,
-     .ex_valid,
+     .ex_specid,
      .ex_br_miss,
      .ex_br_taken,
+     .ex_br_ntaken,
      .ex_fwd_data       (ex_fwd_data[31:0]),
      .mem0_fwd_data     (mem0_fwd_data[31:0]),
      .mem1_fwd_data     (mem1_fwd_data[31:0]),
@@ -452,7 +466,8 @@ module top(
   stage_execute execute
     (/*AUTOINST*/
      // Outputs
-     .ex_br_miss_nt,
+     .ex_specid,
+     .ex_br_ntaken,
      .ex_br_taken,
      .ex_stall,
      .ex_br_miss,
@@ -467,6 +482,8 @@ module top(
      .ex_mem_extend,
      .ex_mem_width      (ex_mem_width[1:0]),
      .ex_wb_reg         (ex_wb_reg[4:0]),
+     .ex_fwd_valid,
+     .ex_fwd_stall,
      .ex_fwd_data       (ex_fwd_data[31:0]),
      // Inputs
      .clk_core,
@@ -476,6 +493,7 @@ module top(
      .de_exc,
      .de_exc_cause,
      .de_pc             (de_pc[31:2]),
+     .de_specid,
      .de_rdata1         (de_rdata1[31:0]),
      .de_rdata2         (de_rdata2[31:0]),
      .de_imm            (de_imm[31:0]),
@@ -503,6 +521,8 @@ module top(
     (/*AUTOINST*/
      // Outputs
      .mem0_stall,
+     .mem0_fwd_valid,
+     .mem0_fwd_stall,
      .mem0_fwd_data     (mem0_fwd_data[31:0]),
      .mem0_dc_read,
      .mem0_dc_trans,
@@ -552,6 +572,8 @@ module top(
      .mem1_mem0_read,
      .mem1_mem0_trans,
      .mem1_mem0_addr    (mem1_mem0_addr[31:2]),
+     .mem1_fwd_valid,
+     .mem1_fwd_stall,
      .mem1_fwd_data     (mem1_fwd_data[31:0]),
      .mem1_tlb_write_req,
      .mem1_tlb_write_super,
@@ -663,14 +685,14 @@ module top(
      // Inputs
      .de_rs1            (de_rs1[4:0]),
      .de_rs2            (de_rs2[4:0]),
-     .ex_valid,
-     .ex_mem_read,
+     .ex_fwd_valid,
+     .ex_fwd_stall,
      .ex_wb_reg         (ex_wb_reg[4:0]),
-     .mem0_valid,
-     .mem0_read,
+     .mem0_fwd_valid,
+     .mem0_fwd_stall,
      .mem0_wb_reg       (mem0_wb_reg[4:0]),
-     .mem1_valid_wb,
-     .mem1_read,
+     .mem1_fwd_valid,
+     .mem1_fwd_stall,
      .mem1_wb_reg       (mem1_wb_reg[4:0]));
 
   csr csr
