@@ -10,8 +10,8 @@ CFLAGS := $(ASFLAGS) -O2 -nostartfiles
 LDFLAGS := -Tlink.ld -Wl,--defsym,TEST_MAGIC=$(TEST_MAGIC)
 
 SRCS_S := $(wildcard *.s)
-SRCS_C := $(wildcard *.c)
-OUTS_ELF := $(SRCS_S:.s=.elf) $(SRCS_C:.c=.elf)
+SRCS_C := $(filter-out dhry_1.c dhry_2.c, $(wildcard *.c))
+OUTS_ELF := $(SRCS_S:.s=.elf) $(SRCS_C:.c=.elf) dhry.elf
 OUTS_HEX := $(OUTS_ELF:.elf=.hex)
 
 .PHONY: all clean
@@ -24,6 +24,9 @@ all: $(OUTS_ELF) $(OUTS_HEX)
 
 %.elf: %.o crt0.o link.ld
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ crt0.o $<
+
+dhry.elf: dhry_1.o dhry_2.o crt0.o link.ld
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ crt0.o dhry_1.o dhry_2.o
 
 %.bin: %.elf
 	riscv64-unknown-elf-objcopy -O binary $< $@
