@@ -1,5 +1,7 @@
 `timescale 1ns/1ps
 
+`include "defines.svh"
+
 module top(
   input logic         clk_core,
   input logic         clk_mig_sys,
@@ -877,6 +879,7 @@ module top(
      .spi_rdata,
      .spi_error);
 
+`ifndef DUMMY_DRAM
   dram_ctl dram_ctl
     (/*AUTOINST*/
      // Outputs
@@ -961,6 +964,28 @@ module top(
     .app_zq_req         ('b0),
     .app_zq_ack         ()
     );
+`else
+  dram_ctl_dummy dram_ctl
+    (/*AUTOINST*/
+     // Outputs
+     .dctl_cready,
+     .dctl_wready,
+     .dctl_rvalid,
+     .dctl_rlast,
+     .dctl_rdata        (dctl_rdata[31:0]),
+     .dctl_error,
+     // Inputs
+     .clk_core,
+     .reset_n,
+     .bmain_cvalid_dctl,
+     .bmain_cmd,
+     .bmain_addr        (bmain_addr[27:2]),
+     .bmain_wvalid_dctl,
+     .bmain_wlast,
+     .bmain_wdata       (bmain_wdata[31:0]),
+     .bmain_wmask       (bmain_wmask[3:0]),
+     .bmain_rready_dctl);
+`endif
 
   rom rom
     (/*AUTOINST*/

@@ -1,6 +1,8 @@
 `ifndef _DEFINES_
 `define _DEFINES_
 
+`define DUMMY_DRAM
+
 // Test magic
 localparam
   TEST_MAGIC = 'hbaddecaf;
