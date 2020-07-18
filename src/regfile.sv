@@ -41,17 +41,17 @@ module regfile(
     else
       rdata2 = regs[rs2];
 
-`ifndef SYNTHESIS
-  always_ff @(posedge clk)
-    if(wen && |wreg)
-      $display("%d: regfile: write %0s (x%0d) = %08x", $stime, abi_names[wreg], wreg, wdata);
-`endif
-
   always_ff @(posedge clk)
     if(~reset_n)
       for(int i=1;i<32;i++)
         regs[i] <= 0;
     else if(wen && |wreg)
       regs[wreg] <= wdata;
+
+`ifndef SYNTHESIS
+  always_ff @(negedge clk)
+    if(wen && |wreg)
+      $display("%d: regfile: write %0s (x%0d) = %08x", $stime, abi_names[wreg], wreg, wdata);
+`endif
 
 endmodule

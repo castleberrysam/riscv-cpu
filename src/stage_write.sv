@@ -57,16 +57,12 @@ module stage_write(
   logic test_stop;
   assign test_stop = wb_exc & (wb_exc_cause == IILLEGAL) & (wb_data == TEST_MAGIC);
 
-  logic [31:0] retire_pc;
-  always_ff @(posedge clk_core)
-    if(wb_valid & ~wb_stall) begin
-      retire_pc <= {wb_pc,2'b0};
-      $strobe("%d: stage_write: retire insn at pc %08x", $stime, retire_pc);
-    end
-
-  always_ff @(posedge clk_core)
-    if(wb_stall)
-      $display("%d: stage_write: stalling", $stime);
+  always_ff @(negedge clk_core)
+    if(wb_valid) begin
+      if(~wb_stall)
+        $strobe("%d: stage_write: retire insn at pc %8x", $stime, {wb_pc,2'b0});
+    end else if(wb_exc)
+      $strobe("%d: stage_write: take exception at pc %8x", $stime, {wb_pc,2'b0});
 `endif
 
 endmodule

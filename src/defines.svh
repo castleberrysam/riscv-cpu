@@ -3,7 +3,7 @@
 
 // Test magic
 localparam
-  TEST_MAGIC = 'hdecafbad;
+  TEST_MAGIC = 'hbaddecaf;
 
 // Opcode definitions
 typedef enum logic [4:0] {

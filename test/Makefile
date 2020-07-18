@@ -1,21 +1,32 @@
-SRCS := $(wildcard *.s)
-OUTS_ELF := $(SRCS:.s=.elf)
-OUTS_HEX := $(SRCS:.s=.hex)
+TEST_MAGIC := 0xbaddecaf
 
-TEST_MAGIC := 0xdecafbad
+TARGET := riscv64-unknown-elf
+AS := $(TARGET)-as
+CPP := $(TARGET)-cpp
+CC := $(TARGET)-gcc
+LD := $(TARGET)-ld
+ASFLAGS := -march=rv32im -mabi=ilp32
+CFLAGS := $(ASFLAGS) -O2 -nostartfiles
+LDFLAGS := -Tlink.ld -Wl,--defsym,TEST_MAGIC=$(TEST_MAGIC)
+
+SRCS_S := $(wildcard *.s)
+SRCS_C := $(wildcard *.c)
+OUTS_ELF := $(SRCS_S:.s=.elf) $(SRCS_C:.c=.elf)
+OUTS_HEX := $(OUTS_ELF:.elf=.hex)
 
 .PHONY: all clean
 
 all: $(OUTS_ELF) $(OUTS_HEX)
 
-%.o: %.s
-	riscv64-linux-gnu-as -march=rv32im --defsym TEST_MAGIC=$(TEST_MAGIC) -o $@ $<
+%.elf %.o: %.s link.ld
+	$(AS) $(ASFLAGS) -o $*.o $<
+	$(LD) -b elf32-littleriscv -Tlink.ld --defsym TEST_MAGIC=$(TEST_MAGIC) -o $*.elf $*.o
 
-%.elf: %.o link.ld
-	riscv64-linux-gnu-ld -melf32lriscv -Tlink.ld -o $@ $<
+%.elf: %.o crt0.o link.ld
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ crt0.o $<
 
 %.bin: %.elf
-	riscv64-linux-gnu-objcopy -O binary $< $@
+	riscv64-unknown-elf-objcopy -O binary $< $@
 
 %.xxd: %.bin
 	xxd -e -c4 -g4 $< $@
@@ -24,4 +35,4 @@ all: $(OUTS_ELF) $(OUTS_HEX)
 	cut -d' ' -f2 $< > $@
 
 clean:
-	-rm *.elf *.hex
+	-rm -r *.elf *.hex *.xxd *.o *.bin logs/

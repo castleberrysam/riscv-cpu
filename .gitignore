@@ -2,6 +2,7 @@ doc/
 *.o
 *.bin
 *.elf
+*.xxd
 *.hex
 *.vcd
 *.dcp
@@ -12,6 +13,8 @@ sim/*.pb
 sim/.Xil
 sim/xsim.dir
 sim/axsim.sh
+
+test/logs
 
 fpga/ip
 fpga/*.jou
