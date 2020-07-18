@@ -47,7 +47,7 @@ module dcache(
   output logic [1:0]   dc_cam_read_flags
   );
 
-  tlb tlb(
+  tlb #("dcache") tlb(
     .clk(clk_core),
     .reset_n(reset_n),
 
@@ -73,7 +73,7 @@ module dcache(
     .write_flags(mem1_tlb_write_flags)
     );
 
-  cam cam(
+  cam #("dcache") cam(
     .clk(clk_core),
     .reset_n(reset_n),
 

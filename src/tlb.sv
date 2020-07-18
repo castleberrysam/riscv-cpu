@@ -25,6 +25,8 @@ module tlb(
   input logic [7:0]    write_flags
   );
 
+  parameter PARENT = "";
+
   logic [3:0]   read_way;
 
   logic         read_req_r;
@@ -143,5 +145,14 @@ module tlb(
       lru_mem[i] = '0;
     end
   end
+
+`ifndef SYNTHESIS
+  always_ff @(negedge clk) begin
+    if(write_req & write_super)
+      $display("%d: %s tlb: write supertlb at %b = asid %0d ppn %b flags %b", $stime, PARENT, read_addr_r[31:22], write_asid, write_ppn[28:22], write_flags);
+    if(write_req & ~write_super)
+      $display("%d: %s tlb: write tlb at %b way %b = tag %b asid %0d ppn %b flags %b", $stime, PARENT, read_addr_r[20:12], read_way, write_tag, write_asid, write_ppn, write_flags);
+  end
+`endif
 
 endmodule

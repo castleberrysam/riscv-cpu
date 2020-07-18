@@ -200,4 +200,13 @@ module csr(
   assign csr_error = unimp | (wen & mem1_csr_addr[11] & mem1_csr_addr[10]);
   assign csr_flush = wen_satp;
 
+`ifndef SYNTHESIS
+  always_ff @(negedge clk_core) begin
+    if(wen)
+      $display("%d: csr: write csr %x = %8x", $stime, mem1_csr_addr, wdata);
+    if(wb_exc & ~eret)
+      $display("%d: csr: mepc = %8x, mcause = %0d, mtval = %8x", $stime, wb_pc, wb_exc_cause, exc_tval);
+  end
+`endif
+
 endmodule

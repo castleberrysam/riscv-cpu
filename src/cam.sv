@@ -28,6 +28,8 @@ module cam(
   input logic [1:0]    write_flags
   );
 
+  parameter PARENT = "";
+
   logic [1:0] read_way;
 
   logic        read_req_r;
@@ -111,5 +113,14 @@ module cam(
       lru_mem[i] = 0;
     end
   end
+
+`ifndef SYNTHESIS
+  always_ff @(negedge clk) begin
+    if(write_req_data)
+      $display("%d: %s cam: write data at %b way %b = data %x mask %b", $stime, PARENT, write_index, read_way, write_data, write_mask);
+    if(write_req_tag_flags)
+      $display("%d: %s cam: write tag/flags at %b way %b = tag %b flags %b", $stime, PARENT, write_index[11:4], read_way, write_tag, write_flags);
+  end
+`endif
 
 endmodule

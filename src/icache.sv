@@ -46,7 +46,7 @@ module icache(
   output logic [1:0]   ic_cam_read_flags
   );
 
-  tlb tlb(
+  tlb #("icache") tlb(
     .clk(clk_core),
     .reset_n(reset_n),
 
@@ -72,7 +72,7 @@ module icache(
     .write_flags(fe1_tlb_write_flags)
     );
 
-  cam cam(
+  cam #("icache") cam(
     .clk(clk_core),
     .reset_n(reset_n),
 

@@ -301,4 +301,15 @@ module bus_main(
   assign bmain_eack_bmmio = 0;
   assign bmain_eack_dctl = 0;
 
+`ifndef SYNTHESIS
+  always_ff @(negedge clk_core) begin
+    if(cmd_done)
+      $display("%d: bus_main: finished", $stime);
+    if(cmd_beat_in)
+      $display("%d: bus_main: start %0s %0s at %8x", $stime, mem1_cvalid ? "memory1" : "fetch1", cmd_in ? "read" : "write", {addr_in,2'b0});
+    if(wdata_beat_in)
+      $display("%d: bus_main: got wdata %8x mask %b", $stime, mem1_bus_wdata, mem1_wmask);
+  end
+`endif
+
 endmodule

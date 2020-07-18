@@ -77,10 +77,56 @@ module tb_top(
     .odt                (ddr3_odt)
     );
 
+
+  int branches, misses;
+  always_ff @(negedge clk_core)
+    if(uut.execute.ex_valid) begin
+      if(uut.execute.ex_br)
+        branches++;
+      if(uut.execute.ex_br_miss)
+        misses++;
+    end
+
+  int bus_cycles, bus_reads, bus_writes;
+  always_ff @(posedge clk_core) begin
+    if(uut.bus_main.cmd_valid)
+      bus_cycles++;
+    if(uut.bus_main.cmd_beat_in) begin
+      if(uut.bus_main.cmd_in)
+        bus_reads++;
+      else
+        bus_writes++;
+    end
+  end
+
+  bit fe0_read_req_r;
+  int icam_hits, icam_misses;
+  always_ff @(posedge clk_core) begin
+    fe0_read_req_r <= uut.icache.fe0_read_req;
+    if(fe0_read_req_r) begin
+      if(uut.icache.ic_cam_read_hit)
+        icam_hits++;
+      else
+        icam_misses++;
+    end
+  end
+
+  bit mem0_dc_read_r;
+  int dcam_hits, dcam_misses;
+  always_ff @(posedge clk_core) begin
+    mem0_dc_read_r <= uut.dcache.mem0_dc_read;
+    if(mem0_dc_read_r) begin
+      if(uut.dcache.dc_cam_read_hit)
+        dcam_hits++;
+      else
+        dcam_misses++;
+    end
+  end
+
   initial
     begin
-      $dumpfile("tb_top.vcd");
-      $dumpvars;
+      // $dumpfile("tb_top.vcd");
+      // $dumpvars;
 
       clk_core = 0;
       clk_mig_ref = 0;
@@ -89,7 +135,18 @@ module tb_top(
       reset_n = 1;
 
       @(posedge uut.write.test_stop);
-      #1 $finish;
+      #1;
+
+      $display("Test complete");
+      $display("Cycles elapsed: %0d", uut.csr.cycle);
+      $display("Instructions retired: %0d", uut.csr.instret);
+      $display("Average CPI: %.3f", $itor(uut.csr.cycle) / $itor(uut.csr.instret));
+      $display("Branch predictor accuracy: %.3f", 1.0 - ($itor(misses) / $itor(branches)));
+      $display("Bus utilization: %.3f", $itor(bus_cycles) / $itor(uut.csr.cycle));
+      $display("Bus write percentage: %.3f", $itor(bus_writes) / $itor(bus_reads + bus_writes));
+      $display("I$ hit rate: %.3f", $itor(icam_hits) / $itor(icam_hits + icam_misses));
+      $display("D$ hit rate: %.3f", $itor(dcam_hits) / $itor(dcam_hits + dcam_misses));
+      $finish;
     end
 
   // core clock: 100MHz
