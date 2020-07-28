@@ -6,6 +6,7 @@ import glob
 import os
 import errno
 import signal
+from argparse import ArgumentParser
 from subprocess import Popen, PIPE, STDOUT
 
 TEST_MAGIC = 0xbaddecaf
@@ -69,15 +70,22 @@ class Instruction:
         self.exc = False
         self.regs = {} # int -> int, maps register numbers to new values
     def __eq__(self, other):
-        return self.pc == other.pc and self.exc == other.exc and self.regs == other.regs
+        return other and self.pc == other.pc and self.exc == other.exc and self.regs == other.regs
     def __str__(self):
-        ret = "pc={}".format(self.pc)
+        ret = "pc={:08x}".format(self.pc)
         ret += " exc={}".format(self.exc)
         for reg in sorted(self.regs.keys()):
             ret += " x{}={:08x}".format(reg, self.regs[reg])
         return ret
 
 class VerilogSim(Process):
+    def __init__(self, testname: str, log: Log):
+        plusargs = {}
+        plusargs["memfile"] = "../test/{}.hex".format(testname)
+        cmd = "sim/axsim.sh"
+        for key,value in sorted(plusargs.items()):
+            cmd += " --testplusarg {}={}".format(key, value)
+        super().__init__(cmd, log)
     def step(self) -> Instruction:
         insn = Instruction()
         while True:
@@ -102,6 +110,8 @@ class VerilogSim(Process):
         return insn
 
 class SpikeSim(Process):
+    def __init__(self, testname: str, log: Log):
+        super().__init__("spike/build/spike -l --log-commits test/{}.elf".format(testname), log)
     def step(self) -> Instruction:
         insn = Instruction()
         while True:
@@ -139,8 +149,8 @@ class Test:
 
     def run(self):
         log = Log("test/logs/{}.log".format(self.name), self.verbose)
-        xsim = VerilogSim("sim/axsim.sh --testplusarg memfile=../test/{}.hex".format(self.name), log)
-        spike = SpikeSim("spike/build/spike -l --log-commits test/{}.elf".format(self.name), log)
+        xsim = VerilogSim(self.name, log)
+        spike = SpikeSim(self.name, log)
         with log, spike, xsim:
             while True:
                 xsim_insn = xsim.step()
@@ -157,24 +167,26 @@ class Test:
                     return
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: " + sys.argv[0] + " <test name>")
-        return
+    parser = ArgumentParser()
+    parser.add_argument("-v", action="store_true")
+    parser.add_argument("--notimeout", action="store_true")
+    parser.add_argument("testnames", action="append")
+    args = parser.parse_args()
 
-    tests = []
-    verbose = False
-    if sys.argv[1] == "all":
-        for elf in glob.iglob("test/*.elf"):
-            tests.append(Test(os.path.basename(elf)[:-4], False))
-        if len(tests) == 0:
+    if args.testnames == ["all"]:
+        args.testnames = []
+        for test in glob.iglob("test/*.elf"):
+            args.testnames.append(os.path.basename(test)[:-4])
+        if len(args.testnames) == 0:
             print("No test binaries found. Maybe you need to run make first.")
             return
-    elif not os.path.exists("test/{}.elf".format(sys.argv[1])):
-        print("Test binary test/{}.elf doesn't exist. Maybe you need to run make first.")
-        return
-    else:
-        verbose = True
-        tests.append(Test(sys.argv[1], True))
+
+    tests = []
+    for testname in args.testnames:
+        if not os.path.exists("test/{}.elf".format(testname)):
+            print("Test binary test/{}.elf doesn't exist. Maybe you need to run make first.".format(testname))
+            return
+        tests.append(Test(testname, args.v))
 
     def alarm_handler(signum, frame):
         raise TimeoutError
@@ -183,17 +195,18 @@ def main():
     mkdir("test/logs")
 
     for test in tests:
-        if not verbose:
+        if not args.v:
             print("{:16s}".format(test.name + ":"), end="", flush=True)
 
         try:
-            signal.alarm(TEST_TIMEOUT)
+            if not args.notimeout:
+                signal.alarm(TEST_TIMEOUT)
             test.run()
         except TimeoutError:
             print("timed out")
             continue
 
-        if not verbose:
+        if not args.v:
             print("pass" if test.success else "fail")
 
 if __name__ == "__main__":
