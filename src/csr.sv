@@ -205,7 +205,7 @@ module csr(
     if(wen)
       $display("%d: csr: write csr %x = %8x", $stime, mem1_csr_addr, wdata);
     if(wb_exc & ~eret)
-      $display("%d: csr: mepc = %8x, mcause = %0d, mtval = %8x", $stime, wb_pc, wb_exc_cause, exc_tval);
+      $display("%d: csr: mepc = %8x, mcause = %0d, mtval = %8x", $stime, {wb_pc,2'b0}, wb_exc_cause, exc_tval);
   end
 `endif
 
