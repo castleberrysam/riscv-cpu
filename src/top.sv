@@ -88,10 +88,10 @@ module top(
   logic [31:2]          csr_newpc;
   logic [31:0]          csr_satp;
   logic                 csr_setpc;
+  logic [1:0]           dc_cam_lru_flags;
+  logic [28:12]         dc_cam_lru_tag;
   logic [31:0]          dc_cam_read_data;
-  logic [1:0]           dc_cam_read_flags;
   logic                 dc_cam_read_hit;
-  logic [28:12]         dc_cam_read_tag_out;
   logic [7:0]           dc_tlb_read_flags;
   logic                 dc_tlb_read_hit;
   logic [28:12]         dc_tlb_read_ppn;
@@ -164,12 +164,13 @@ module top(
   logic                 fe0_specid;
   logic                 fe0_valid;
   logic [28:2]          fe1_addr;
-  logic [28:12]         fe1_cam_read_tag_in;
+  logic                 fe1_cam_lru_update;
+  logic [28:12]         fe1_cam_read_tag;
   logic [31:0]          fe1_cam_write_data;
   logic [1:0]           fe1_cam_write_flags;
-  logic [11:2]          fe1_cam_write_index;
-  logic                 fe1_cam_write_req_data;
-  logic                 fe1_cam_write_req_tag_flags;
+  logic                 fe1_cam_write_lru_way;
+  logic [1:0]           fe1_cam_write_offset;
+  logic                 fe1_cam_write_req;
   logic [28:12]         fe1_cam_write_tag;
   logic                 fe1_cmd;
   logic                 fe1_cvalid;
@@ -196,10 +197,10 @@ module top(
   fwd_type_t            fwd_rs1;
   fwd_type_t            fwd_rs2;
   logic                 fwd_stall;
+  logic [1:0]           ic_cam_lru_flags;
+  logic [28:12]         ic_cam_lru_tag;
   logic [31:0]          ic_cam_read_data;
-  logic [1:0]           ic_cam_read_flags;
   logic                 ic_cam_read_hit;
-  logic [28:12]         ic_cam_read_tag_out;
   logic [7:0]           ic_tlb_read_flags;
   logic                 ic_tlb_read_hit;
   logic [28:12]         ic_tlb_read_ppn;
@@ -227,15 +228,16 @@ module top(
   logic                 mem0_write;
   logic [28:2]          mem1_bus_addr;
   logic [31:0]          mem1_bus_wdata;
+  logic                 mem1_cam_lru_update;
   logic [11:2]          mem1_cam_read_index;
   logic                 mem1_cam_read_req;
-  logic [28:12]         mem1_cam_read_tag_in;
+  logic [28:12]         mem1_cam_read_tag;
   logic [31:0]          mem1_cam_write_data;
   logic [1:0]           mem1_cam_write_flags;
-  logic [11:2]          mem1_cam_write_index;
+  logic                 mem1_cam_write_lru_way;
   logic [3:0]           mem1_cam_write_mask;
-  logic                 mem1_cam_write_req_data;
-  logic                 mem1_cam_write_req_tag_flags;
+  logic [1:0]           mem1_cam_write_offset;
+  logic                 mem1_cam_write_req;
   logic [28:12]         mem1_cam_write_tag;
   logic                 mem1_cmd;
   logic [11:0]          mem1_csr_addr;
@@ -352,13 +354,14 @@ module top(
      .fe1_tlb_write_asid(fe1_tlb_write_asid[8:0]),
      .fe1_tlb_write_ppn (fe1_tlb_write_ppn[28:12]),
      .fe1_tlb_write_flags(fe1_tlb_write_flags[7:0]),
-     .fe1_cam_read_tag_in(fe1_cam_read_tag_in[28:12]),
-     .fe1_cam_write_index(fe1_cam_write_index[11:2]),
-     .fe1_cam_write_req_data,
+     .fe1_cam_read_tag  (fe1_cam_read_tag[28:12]),
+     .fe1_cam_write_req,
+     .fe1_cam_write_lru_way,
+     .fe1_cam_write_offset(fe1_cam_write_offset[1:0]),
      .fe1_cam_write_data(fe1_cam_write_data[31:0]),
-     .fe1_cam_write_req_tag_flags,
      .fe1_cam_write_tag (fe1_cam_write_tag[28:12]),
      .fe1_cam_write_flags(fe1_cam_write_flags[1:0]),
+     .fe1_cam_lru_update,
      .fe1_valid,
      .fe1_exc,
      .fe1_pc            (fe1_pc[31:2]),
@@ -383,9 +386,9 @@ module top(
      .ic_tlb_read_ppn   (ic_tlb_read_ppn[28:12]),
      .ic_tlb_read_flags (ic_tlb_read_flags[7:0]),
      .ic_cam_read_hit,
-     .ic_cam_read_tag_out(ic_cam_read_tag_out[28:12]),
      .ic_cam_read_data  (ic_cam_read_data[31:0]),
-     .ic_cam_read_flags (ic_cam_read_flags[1:0]),
+     .ic_cam_lru_tag    (ic_cam_lru_tag[28:12]),
+     .ic_cam_lru_flags  (ic_cam_lru_flags[1:0]),
      .de_stall,
      .ex_valid,
      .ex_specid,
@@ -581,16 +584,17 @@ module top(
      .mem1_tlb_write_asid(mem1_tlb_write_asid[8:0]),
      .mem1_tlb_write_ppn(mem1_tlb_write_ppn[28:12]),
      .mem1_tlb_write_flags(mem1_tlb_write_flags[7:0]),
-     .mem1_cam_read_tag_in(mem1_cam_read_tag_in[28:12]),
      .mem1_cam_read_req,
      .mem1_cam_read_index(mem1_cam_read_index[11:2]),
-     .mem1_cam_write_index(mem1_cam_write_index[11:2]),
-     .mem1_cam_write_req_data,
+     .mem1_cam_read_tag (mem1_cam_read_tag[28:12]),
+     .mem1_cam_write_req,
+     .mem1_cam_write_lru_way,
+     .mem1_cam_write_offset(mem1_cam_write_offset[1:0]),
      .mem1_cam_write_data(mem1_cam_write_data[31:0]),
      .mem1_cam_write_mask(mem1_cam_write_mask[3:0]),
-     .mem1_cam_write_req_tag_flags,
      .mem1_cam_write_tag(mem1_cam_write_tag[28:12]),
      .mem1_cam_write_flags(mem1_cam_write_flags[1:0]),
+     .mem1_cam_lru_update,
      .mem1_cvalid,
      .mem1_cmd,
      .mem1_bus_addr     (mem1_bus_addr[28:2]),
@@ -635,9 +639,9 @@ module top(
      .dc_tlb_read_ppn   (dc_tlb_read_ppn[28:12]),
      .dc_tlb_read_flags (dc_tlb_read_flags[7:0]),
      .dc_cam_read_hit,
-     .dc_cam_read_tag_out(dc_cam_read_tag_out[28:12]),
      .dc_cam_read_data  (dc_cam_read_data[31:0]),
-     .dc_cam_read_flags (dc_cam_read_flags[1:0]),
+     .dc_cam_lru_tag    (dc_cam_lru_tag[28:12]),
+     .dc_cam_lru_flags  (dc_cam_lru_flags[1:0]),
      .bmain_cready_mem1,
      .bmain_wready_mem1,
      .bmain_rvalid_mem1,
@@ -728,9 +732,9 @@ module top(
      .ic_tlb_read_ppn   (ic_tlb_read_ppn[28:12]),
      .ic_tlb_read_flags (ic_tlb_read_flags[7:0]),
      .ic_cam_read_hit,
-     .ic_cam_read_tag_out(ic_cam_read_tag_out[28:12]),
      .ic_cam_read_data  (ic_cam_read_data[31:0]),
-     .ic_cam_read_flags (ic_cam_read_flags[1:0]),
+     .ic_cam_lru_tag    (ic_cam_lru_tag[28:12]),
+     .ic_cam_lru_flags  (ic_cam_lru_flags[1:0]),
      // Inputs
      .clk_core,
      .reset_n,
@@ -746,13 +750,14 @@ module top(
      .fe1_tlb_write_asid(fe1_tlb_write_asid[8:0]),
      .fe1_tlb_write_ppn (fe1_tlb_write_ppn[28:12]),
      .fe1_tlb_write_flags(fe1_tlb_write_flags[7:0]),
-     .fe1_cam_read_tag_in(fe1_cam_read_tag_in[28:12]),
-     .fe1_cam_write_index(fe1_cam_write_index[11:2]),
-     .fe1_cam_write_req_data,
+     .fe1_cam_read_tag  (fe1_cam_read_tag[28:12]),
+     .fe1_cam_write_req,
+     .fe1_cam_write_lru_way,
+     .fe1_cam_write_offset(fe1_cam_write_offset[1:0]),
      .fe1_cam_write_data(fe1_cam_write_data[31:0]),
-     .fe1_cam_write_req_tag_flags,
      .fe1_cam_write_tag (fe1_cam_write_tag[28:12]),
-     .fe1_cam_write_flags(fe1_cam_write_flags[1:0]));
+     .fe1_cam_write_flags(fe1_cam_write_flags[1:0]),
+     .fe1_cam_lru_update);
 
   dcache dcache
     (/*AUTOINST*/
@@ -762,9 +767,9 @@ module top(
      .dc_tlb_read_ppn   (dc_tlb_read_ppn[28:12]),
      .dc_tlb_read_flags (dc_tlb_read_flags[7:0]),
      .dc_cam_read_hit,
-     .dc_cam_read_tag_out(dc_cam_read_tag_out[28:12]),
      .dc_cam_read_data  (dc_cam_read_data[31:0]),
-     .dc_cam_read_flags (dc_cam_read_flags[1:0]),
+     .dc_cam_lru_tag    (dc_cam_lru_tag[28:12]),
+     .dc_cam_lru_flags  (dc_cam_lru_flags[1:0]),
      // Inputs
      .clk_core,
      .reset_n,
@@ -778,16 +783,17 @@ module top(
      .mem1_tlb_write_asid(mem1_tlb_write_asid[8:0]),
      .mem1_tlb_write_ppn(mem1_tlb_write_ppn[28:12]),
      .mem1_tlb_write_flags(mem1_tlb_write_flags[7:0]),
-     .mem1_cam_read_tag_in(mem1_cam_read_tag_in[28:12]),
      .mem1_cam_read_req,
      .mem1_cam_read_index(mem1_cam_read_index[11:2]),
-     .mem1_cam_write_index(mem1_cam_write_index[11:2]),
-     .mem1_cam_write_req_data,
+     .mem1_cam_read_tag (mem1_cam_read_tag[28:12]),
+     .mem1_cam_write_req,
+     .mem1_cam_write_lru_way,
+     .mem1_cam_write_offset(mem1_cam_write_offset[1:0]),
      .mem1_cam_write_data(mem1_cam_write_data[31:0]),
      .mem1_cam_write_mask(mem1_cam_write_mask[3:0]),
-     .mem1_cam_write_req_tag_flags,
      .mem1_cam_write_tag(mem1_cam_write_tag[28:12]),
-     .mem1_cam_write_flags(mem1_cam_write_flags[1:0]));
+     .mem1_cam_write_flags(mem1_cam_write_flags[1:0]),
+     .mem1_cam_lru_update);
 
   bus_main bus_main
     (/*AUTOINST*/

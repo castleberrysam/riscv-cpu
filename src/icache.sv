@@ -23,16 +23,18 @@ module icache(
   input logic [28:12]  fe1_tlb_write_ppn,
   input logic [7:0]    fe1_tlb_write_flags,
 
-  input logic [28:12]  fe1_cam_read_tag_in,
+  input logic [28:12]  fe1_cam_read_tag,
 
-  input logic [11:2]   fe1_cam_write_index,
+  input logic          fe1_cam_write_req,
+  input logic          fe1_cam_write_lru_way,
+  input logic [1:0]    fe1_cam_write_offset,
 
-  input logic          fe1_cam_write_req_data,
   input logic [31:0]   fe1_cam_write_data,
 
-  input logic          fe1_cam_write_req_tag_flags,
   input logic [28:12]  fe1_cam_write_tag,
   input logic [1:0]    fe1_cam_write_flags,
+
+  input logic          fe1_cam_lru_update,
 
   // outputs to fetch1
   output logic         ic_tlb_read_hit,
@@ -41,9 +43,9 @@ module icache(
   output logic [7:0]   ic_tlb_read_flags,
 
   output logic         ic_cam_read_hit,
-  output logic [28:12] ic_cam_read_tag_out,
   output logic [31:0]  ic_cam_read_data,
-  output logic [1:0]   ic_cam_read_flags
+  output logic [28:12] ic_cam_lru_tag,
+  output logic [1:0]   ic_cam_lru_flags
   );
 
   tlb #("icache") tlb(
@@ -79,24 +81,27 @@ module icache(
     // read inputs
     .read_req(fe0_read_req),
     .read_index(fe0_read_addr[11:2]),
-    .read_tag_in(fe1_cam_read_tag_in),
+    .read_tag(fe1_cam_read_tag),
 
     // read outputs
     .read_hit(ic_cam_read_hit),
-    .read_tag_out(ic_cam_read_tag_out),
     .read_data(ic_cam_read_data),
-    .read_flags(ic_cam_read_flags),
 
     // write inputs
-    .write_index(fe1_cam_write_index),
+    .write_req(fe1_cam_write_req),
+    .write_lru_way(fe1_cam_write_lru_way),
+    .write_offset(fe1_cam_write_offset),
 
-    .write_req_data(fe1_cam_write_req_data),
     .write_data(fe1_cam_write_data),
     .write_mask('1),
 
-    .write_req_tag_flags(fe1_cam_write_req_tag_flags),
     .write_tag(fe1_cam_write_tag),
-    .write_flags(fe1_cam_write_flags)
+    .write_flags(fe1_cam_write_flags),
+
+    // lru
+    .lru_update(fe1_cam_lru_update),
+    .lru_tag(ic_cam_lru_tag),
+    .lru_flags(ic_cam_lru_flags)
     );
 
 endmodule

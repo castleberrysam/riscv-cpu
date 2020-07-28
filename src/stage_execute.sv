@@ -127,13 +127,27 @@ module stage_execute(
   assign ex_valid = valid & ~ex_stall & ~exc & ~csr_kill;
   assign ex_exc = exc & ~csr_kill;
 
-  logic br_check, br_cond;
-  assign br_check = valid & ~ex_stall & ex_br;
+  logic br_cond, br_miss, br_ntaken, br_taken;
   assign br_cond = ex_br_inv ^ cmp_out;
+  assign br_miss = valid & ex_br & (ex_br_pred ^ br_cond);
+  assign br_ntaken = valid & ex_br & ~br_cond;
+  assign br_taken = valid & (ex_jump | (ex_br & br_cond));
 
-  assign ex_br_miss = br_check & (ex_br_pred ^ br_cond);
-  assign ex_br_ntaken = br_check & ~br_cond;
-  assign ex_br_taken = valid & ~ex_stall & (ex_jump | (ex_br & br_cond));
+  logic br_miss_r, br_ntaken_r, br_taken_r;
+  always_ff @(posedge clk_core)
+    if(~ex_stall | csr_kill) begin
+      br_miss_r <= 0;
+      br_ntaken_r <= 0;
+      br_taken_r <= 0;
+    end else begin
+      br_miss_r <= br_miss;
+      br_ntaken_r <= br_ntaken;
+      br_taken_r <= br_taken;
+    end
+
+  assign ex_br_miss = br_miss & ~br_miss_r;
+  assign ex_br_ntaken = br_ntaken & ~br_ntaken_r;
+  assign ex_br_taken = br_taken & ~br_taken_r;
 
   logic [31:0] op1, op2;
   assign op1 = ex_use_pc ? {ex_pc,2'b0} : ex_rdata1;
@@ -217,11 +231,5 @@ module stage_execute(
   assign mul_stall = mul_go & ~mul_done;
 
   assign ex_stall = (valid & (mem0_stall | mul_stall)) | (exc & mem0_stall);
-
-`ifndef SYNTHESIS
-  always_ff @(posedge clk_core)
-    if(ex_stall)
-      $display("%d: stage_execute: stalling", $stime);
-`endif
 
 endmodule

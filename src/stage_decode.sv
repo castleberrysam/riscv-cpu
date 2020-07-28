@@ -242,24 +242,35 @@ module stage_decode(
     if(de_br)
       br_miss_pc_r <= br_miss_pc[31:2];
 
+  logic setpc_miss, setpc_pred, setpc_pred_r;
+  always_ff @(posedge clk_core)
+    if(~de_stall | kill)
+      setpc_pred_r <= 0;
+    else
+      setpc_pred_r <= setpc_pred;
+
+  assign de_setpc = setpc_miss | (setpc_pred & ~setpc_pred_r);
+
   logic [31:0] newpc;
-  always_comb
+  always_comb begin
+    setpc_miss = 0;
+    setpc_pred = 0;
+    de_setspecid = 0;
+    newpc = '0;
+
     if(ex_br_miss & (ex_br_taken | ~valid | ~transfer | ~(de_jump | br_take))) begin
-      de_setpc = 1;
+      setpc_miss = 1;
       de_setspecid = 1;
       newpc = {br_miss_pc_r,2'b0};
-    end else if(valid & ~de_stall & transfer & (de_jump | br_take) & ~ex_br_taken) begin
-      de_setpc = 1;
+    end else if(valid & ~jalr_stall & transfer & (de_jump | br_take) & ~ex_br_taken) begin
+      setpc_pred = 1;
       de_setspecid = ~ex_br_miss;
       if(jalr)
         newpc = (rdata1 + imm) & ~1;
       else
         newpc = {de_pc,2'b0} + imm;
-    end else begin
-      de_setpc = 0;
-      de_setspecid = 0;
-      newpc = '0;
     end
+  end
 
   logic misalign;
   assign de_newpc = newpc[31:2];
@@ -369,11 +380,5 @@ module stage_decode(
   assign jalr_stall = jalr & fwd_rs1.ex;
 
   assign de_stall = (valid & (ex_stall | jalr_stall | fwd_stall)) | (exc & ex_stall);
-
-`ifndef SYNTHESIS
-  always_ff @(posedge clk_core)
-    if(de_stall)
-      $display("%d: stage_decode: stalling", $stime);
-`endif
 
 endmodule
