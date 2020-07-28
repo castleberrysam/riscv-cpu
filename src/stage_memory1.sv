@@ -345,7 +345,7 @@ module stage_memory1(
 
   // cam state machine
   logic cam_exc;
-  assign cam_exc = bmain_error_mem1;
+  assign cam_exc = bmain_error_mem1 | (~cam_state.idle & pma_error);
   assign mem1_eack = bmain_error_mem1;
 
   logic bus_stall_cmd, bus_stall_wdata, bus_stall_rdata, bus_stall;
@@ -359,7 +359,7 @@ module stage_memory1(
   assign bus_beat_rdata = mem1_rready & bmain_rvalid_mem1;
 
   struct packed {
-    logic idle, evict0, evict1, fill0, fill1, fill2;
+    logic idle, evict0, evict1, fill0, fill1, fill2, uncached;
   } cam_state, cam_state_next;
 
   logic cam_dout_sel, cam_dout_sel_r;
@@ -510,16 +510,22 @@ module stage_memory1(
       end
 
       cam_state.evict0: begin
-        mem1_cvalid = 1;
+        mem1_cvalid = ~pma_error;
         mem1_bus_addr = {dc_cam_lru_tag,mem1_addr[11:4],2'b0};
+        if(pma_cacheable) begin
+          // initiate bus write
+          mem1_cmd = 0;
 
-        // initiate bus write
-        mem1_cmd = 0;
+          // read word from cache
+          mem1_cam_read_req = 1;
 
-        // read word from cache
-        mem1_cam_read_req = 1;
+          cam_state_next = '{evict1:1,default:0};
+        end else begin
+          // initiate bus access
+          mem1_cmd = mem1_read | tlb_fill_req;
 
-        cam_state_next = '{evict1:1,default:0};
+          cam_state_next = '{uncached:1,default:0};
+        end
       end
 
       cam_state.evict1: begin
@@ -538,12 +544,19 @@ module stage_memory1(
       end
 
       cam_state.fill0: begin
-        // initiate bus read
-        mem1_cvalid = 1;
-        mem1_cmd = 1;
+        mem1_cvalid = ~pma_error;
         mem1_bus_addr = {cam_tag,mem1_addr[11:4],2'b0};
+        if(pma_cacheable) begin
+          // initiate bus read
+          mem1_cmd = 1;
 
-        cam_state_next = '{fill1:1,default:0};
+          cam_state_next = '{fill1:1,default:0};
+        end else begin
+          // initiate bus access
+          mem1_cmd = mem1_read | tlb_fill_req;
+
+          cam_state_next = '{uncached:1,default:0};
+        end
       end
 
       cam_state.fill1: begin
@@ -575,8 +588,38 @@ module stage_memory1(
           cam_state_next = '{idle:1,default:0};
         end
       end
+
+      cam_state.uncached: begin
+        // continue bus access
+        mem1_rready = mem1_read | tlb_fill_req;
+        mem1_wvalid = mem1_write & ~tlb_fill_req;
+        mem1_bus_wdata = cam_wdata;
+        mem1_wmask = cam_wmask;
+
+        // capture read data
+        cam_rword_wen = 1;
+
+        // select captured data
+        cam_dout_sel = 1;
+
+        cam_state_next = '{idle:1,default:0};
+      end
     endcase
   end
+
+  logic pma_error, pma_cacheable;
+  pma_checker pma_checker(
+    .clk_core(clk_core),
+    .reset_n(reset_n),
+
+    .read(mem1_read),
+    .write(mem1_write),
+    .width(mem1_width),
+    .ppn(cam_tag),
+
+    .pma_cacheable(pma_cacheable),
+    .pma_error(pma_error)
+    );
 
   always_comb
     unique case(1)

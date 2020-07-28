@@ -248,7 +248,7 @@ module stage_fetch1(
 
   // cam state machine
   logic cam_exc;
-  assign cam_exc = bmain_error_fe1;
+  assign cam_exc = bmain_error_fe1 | (~cam_state.idle & pma_error);
   assign fe1_eack = bmain_error_fe1;
 
   logic bus_stall_cmd, bus_stall_rdata, bus_stall;
@@ -260,7 +260,7 @@ module stage_fetch1(
   assign bus_beat_rdata = fe1_rready & bmain_rvalid_fe1;
 
   struct packed {
-    logic idle, fill0, fill1;
+    logic idle, fill0, fill1, uncached;
   } cam_state, cam_state_next;
 
   logic fe1_insn_sel, fe1_insn_sel_r;
@@ -328,8 +328,11 @@ module stage_fetch1(
 
       cam_state.fill0: begin
         // initiate bus read
-        fe1_cvalid = 1;
-        cam_state_next = '{fill1:1,default:0};
+        fe1_cvalid = ~pma_error;
+        if(pma_cacheable)
+          cam_state_next = '{fill1:1,default:0};
+        else
+          cam_state_next = '{uncached:1,default:0};
       end
 
       cam_state.fill1: begin
@@ -356,8 +359,35 @@ module stage_fetch1(
           cam_state_next = '{idle:1,default:0};
         end
        end
+
+      cam_state.uncached: begin
+        // continue bus read
+        fe1_rready = 1;
+
+        // capture instruction
+        cam_insn_wen = 1;
+
+        // select captured instruction
+        fe1_insn_sel = 1;
+
+        cam_state_next = '{idle:1,default:0};
+      end
     endcase
   end
+
+  logic pma_error, pma_cacheable;
+  pma_checker pma_checker(
+    .clk_core(clk_core),
+    .reset_n(reset_n),
+
+    .read('b1),
+    .write('b0),
+    .width('b10),
+    .ppn(fe1_cam_read_tag),
+
+    .pma_cacheable(pma_cacheable),
+    .pma_error(pma_error)
+    );
 
   logic exc;
   assign busy = cam_stall;

@@ -153,7 +153,7 @@ module bus_main(
   // address space:
   // 00000000-0000ffff: 64KiB block rom
   // 01000000-01ffffff: 16MiB QSPI flash
-  // 02000000-02000fff: mmio peripherals
+  // 02000000-0200ffff: mmio peripherals
   // 10000000-1fffffff: 256MiB DDR3 dram
   // accessing any other address raises an error (access fault)
   struct packed {
@@ -165,7 +165,7 @@ module bus_main(
       unique casez({addr,2'b0})
         'h0000????: sel.rom = 1;
         'h01??????: sel.flash = 1;
-        'h02000???: sel.bmmio = 1;
+        'h0200????: sel.bmmio = 1;
         'h1???????: sel.dctl = 1;
         default: sel.none = 1;
       endcase
