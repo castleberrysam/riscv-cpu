@@ -1,7 +1,9 @@
 `ifndef _DEFINES_
 `define _DEFINES_
 
+`ifndef SYNTHESIS
 `define DUMMY_DRAM
+`endif
 
 // Test magic
 localparam
