@@ -39,4 +39,4 @@ top.mcs top.prm &: top.bit gen_mcs.tcl
 	vivado -nojou -mode batch -source gen_mcs.tcl
 
 clean:
-	-rm -r *.o *.bin *.mif *.bit *.edif *.mcs *.prm *.jou *.log *.html *.xml *.str *.dcp .Xil/
+	-rm -r *.o *.bin *.mif *.bit *.edif *.mcs *.prm *.jou *.log *.html *.xml *.str *.dcp .hbs/ .Xil/
