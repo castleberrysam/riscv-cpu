@@ -8,7 +8,6 @@ Yet another RISC-V soft core.
 - Testing
   - python3
   - xxd
-  - qemu-system-riscv32
   - binutils-riscv64-linux-gnu (including gdb)
 - FPGA synthesis
   - Board based on XC7S50 chip or similar
@@ -20,10 +19,7 @@ Just run make in the top-level directory. The sources in src/ will be built with
 xsim and the tests in test/ will be built with binutils.
 
 * Running/testing
-To run a test in qemu, use run-gdb-qemu.sh with the name of a test (for example,
-"run-gdb-qemu.sh addi"). To run a test in xsim, use run-xsim.sh
-instead. Finally, use run-test.py to run both qemu and xsim and compare the
-results. You can specify "all" as the test name to run all of the tests.
+TODO update this section for spike
 
 Every time you run a test in xsim, it should dump a tb_top.vcd file in the sim/
 directory with a signal trace for the test. You can examine this vcd file using
@@ -36,24 +32,24 @@ TODO update this section for vivado
 Currently only assembly is supported for tests. Every test must begin with a
 .text directive and end with an invalid instruction (.word 0). The test runner
 loads the assembled code at address 0x80000000 and executes it until the invalid
-instruction is encountered. The test shouldn't read or write to memory addresses
-below 0x80000000 since qemu doesn't like it.
+instruction is encountered.
 
 * Task list [3/16]
 - [X] Timing constraints/optimization
   - Current target: 80MHz
-- [ ] Replacement of qemu with spike
+- [X] Replacement of qemu with spike
 - [X] Branch prediction
   - Backward predicted taken, forward predicted not taken
   - 1 cycle miss penalty
-- [ ] Interrupts/exceptions
+- [X] Interrupts/exceptions
 - [ ] Integer division
-- [ ] Memory mapped I/O (peripherals)
-- [ ] Virtual memory
-- [ ] Privileged ISA
+- [X] Memory mapped I/O (peripherals)
+- [X] Virtual memory
+  - [ ] FENCE.VMA implementation
+- [X] Privileged ISA
 - [ ] Compressed instructions
 - [ ] Atomics
-- [ ] Caching
+- [X] Caching
 - [ ] Floating point
 - [ ] Multiple fetch/decode/execute (superscalar)
 - [ ] Out-of-order execution
